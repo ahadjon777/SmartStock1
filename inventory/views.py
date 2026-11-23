@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Equipment, Movement, Region
+from .notify import notify
 
 PERIODS = {
     "week": ("Hafta", 7),
@@ -55,6 +56,7 @@ def scan_api(request):
             )
             item.status = Equipment.Status.OUT
             item.save(update_fields=["status"])
+            notify(f"📤 {taken_by} oldi: {item.code} {item.name} ({Region(region).label})")
             return JsonResponse({"ok": True, "action": "out", "message": f"{item.name} chiqarildi"})
 
         movement = item.movements.filter(in_at__isnull=True).first()
@@ -64,6 +66,38 @@ def scan_api(request):
         item.status = Equipment.Status.IN_STOCK
         item.save(update_fields=["status"])
         return JsonResponse({"ok": True, "action": "in", "message": f"{item.name} qaytarildi"})
+
+
+@login_required
+def assign(request):
+    return render(request, "inventory/assign.html")
+
+
+@login_required
+@require_POST
+def assign_api(request):
+    """Tadbir joyida: javobgar olgan texnikalarni xodimga (F.I.Sh.) biriktiradi."""
+    try:
+        data = json.loads(request.body)
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Noto'g'ri so'rov"}, status=400)
+
+    holder = (data.get("holder") or "").strip()
+    codes = [str(c).strip() for c in data.get("codes") or [] if str(c).strip()]
+    if not holder or not codes:
+        return JsonResponse({"ok": False, "error": "F.I.Sh. va kamida bitta kod kerak"}, status=400)
+
+    movements = Movement.objects.filter(equipment__code__in=codes, in_at__isnull=True)
+    found = set(movements.values_list("equipment__code", flat=True))
+    missing = [c for c in codes if c not in found]
+    movements.update(holder=holder)
+    if found:
+        notify(f"📌 {holder} ga biriktirildi: {len(found)} ta ({', '.join(sorted(found))})")
+    return JsonResponse({
+        "ok": bool(found), "assigned": len(found), "missing": missing,
+        "message": f"{len(found)} ta texnika {holder} ga biriktirildi",
+        "error": "Tadbirda bunday texnika yo'q" if not found else "",
+    })
 
 
 @login_required

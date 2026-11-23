@@ -30,7 +30,7 @@ td,th{padding:10px 6px;border-bottom:1px solid var(--line);text-align:left}
 <nav>
 <span class="logo">SmartStock</span>
 {% if user.is_authenticated %}
-<span><a href="{% url 'scan' %}">Skaner</a> &nbsp; <a href="{% url 'dashboard' %}">Statistika</a> &nbsp; <a href="{% url 'admin:index' %}">Admin</a></span>
+<span><a href="{% url 'scan' %}">Skaner</a> &nbsp; <a href="{% url 'assign' %}">Biriktirish</a> &nbsp; <a href="{% url 'dashboard' %}">Statistika</a> &nbsp; <a href="{% url 'admin:index' %}">Admin</a></span>
 {% endif %}
 </nav>
 {% block content %}{% endblock %}

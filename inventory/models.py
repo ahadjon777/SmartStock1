@@ -52,6 +52,7 @@ class Movement(models.Model):
     )
     taken_by = models.CharField("Olgan shaxs (F.I.Sh.)", max_length=150)
     region = models.CharField("Hudud", max_length=20, choices=Region.choices)
+    holder = models.CharField("Biriktirilgan shaxs (F.I.Sh.)", max_length=150, blank=True)
     event = models.CharField("Tadbir", max_length=200, blank=True)
     out_at = models.DateTimeField("Chiqqan vaqt")
     in_at = models.DateTimeField("Qaytgan vaqt", null=True, blank=True)

@@ -61,6 +61,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_ADMIN_IDS = [int(i) for i in os.environ.get("TELEGRAM_ADMIN_IDS", "").split(",") if i.strip()]
+
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "scan"
 LOGOUT_REDIRECT_URL = "login"
