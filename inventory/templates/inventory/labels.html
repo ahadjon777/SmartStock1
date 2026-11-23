@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR yorliqlar</title>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,sans-serif;margin:0;padding:12px;color:#000;background:#fff}
+form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+form input,form select,form button{padding:9px;font-size:1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.l{border:1px dashed #999;padding:6px;text-align:center;break-inside:avoid}
+.l svg{width:100%;height:auto;max-width:110px}
+.l b{display:block;font-size:.85rem}
+.l span{display:block;font-size:.7rem;color:#444;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+@media print{form{display:none}body{padding:0}.grid{grid-template-columns:repeat(5,1fr)}}
+</style>
+</head>
+<body>
+<form method="get">
+<select name="warehouse"><option value="">Barcha omborlar</option>{% for w in warehouses %}<option value="{{ w.id }}"{% if request.GET.warehouse == w.id|stringformat:"s" %} selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
+<input name="q" placeholder="Kod boshlanishi" value="{{ request.GET.q }}">
+<input name="limit" type="number" placeholder="Soni (maks 500)" value="{{ request.GET.limit }}">
+<button>Ko'rsatish</button>
+<button type="button" onclick="print()">Chop etish</button>
+</form>
+<div class="grid">
+{% for i in items %}<div class="l">{{ i.svg|safe }}<b>{{ i.code }}</b><span>{{ i.name }}</span></div>{% empty %}<p>Texnika topilmadi.</p>{% endfor %}
+</div>
+</body>
+</html>

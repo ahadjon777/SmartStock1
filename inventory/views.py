@@ -3,6 +3,8 @@ from datetime import timedelta
 from collections import defaultdict
 from decimal import Decimal
 
+import segno
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -10,7 +12,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Equipment, Movement, Region
+from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
 
 PERIODS = {
@@ -66,6 +68,25 @@ def scan_api(request):
         item.status = Equipment.Status.IN_STOCK
         item.save(update_fields=["status"])
         return JsonResponse({"ok": True, "action": "in", "message": f"{item.name} qaytarildi"})
+
+
+@staff_member_required
+def labels(request):
+    """QR yorliqlarni chop etish: ?warehouse=<id>&q=<kod boshlanishi>&limit=<son>."""
+    qs = Equipment.objects.select_related("warehouse").order_by("code")
+    if request.GET.get("warehouse", "").isdigit():
+        qs = qs.filter(warehouse_id=request.GET["warehouse"])
+    if request.GET.get("q"):
+        qs = qs.filter(code__startswith=request.GET["q"])
+    limit = int(request.GET["limit"]) if request.GET.get("limit", "").isdigit() else 60
+    items = [
+        {"code": e.code, "name": e.name,
+         "svg": segno.make(e.code, error="m").svg_inline(scale=4, border=1, dark="#000")}
+        for e in qs[: min(limit, 500)]
+    ]
+    return render(request, "inventory/labels.html", {
+        "items": items, "warehouses": Warehouse.objects.all(),
+    })
 
 
 @login_required
