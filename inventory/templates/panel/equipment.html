@@ -1,0 +1,31 @@
+{% extends "panel/base.html" %}
+{% block panel %}
+<form method="get" class="bar">
+<input name="q" value="{{ request.GET.q }}" placeholder="Kod yoki nomi">
+<select name="warehouse"><option value="">Barcha omborlar</option>{% for w in warehouses %}<option value="{{ w.id }}"{% if request.GET.warehouse == w.id|stringformat:"s" %} selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
+<select name="status"><option value="">Har qanday holat</option>{% for v, l in statuses %}<option value="{{ v }}"{% if request.GET.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+<button class="sm">Ko'rsatish</button>
+</form>
+<div class="bar">
+<a class="btn sm" href="{% url 'panel_equipment_new' %}">+ Yangi texnika</a>
+{% if panel_admin %}<a class="btn sm" href="{% url 'panel_import' %}" style="background:#232a45">Excel yuklash</a>
+<a class="btn sm" href="{% url 'labels' %}" style="background:#232a45">QR yorliqlar</a>{% endif %}
+</div>
+<div class="card tw">
+<table>
+<tr><th>Kod</th><th>Nomi</th><th>Ombor</th><th>Holati</th><th></th></tr>
+{% for e in page %}<tr>
+<td>{{ e.code }}</td><td>{{ e.name }}</td><td>{{ e.warehouse }}</td>
+<td><span class="tag {% if e.status == 'out' %}o{% else %}g{% endif %}">{{ e.get_status_display }}</span></td>
+<td><a class="l" href="{% url 'panel_equipment_edit' e.pk %}">Tahrirlash</a></td>
+</tr>{% empty %}<tr><td colspan="5" class="muted">Texnika topilmadi</td></tr>{% endfor %}
+</table>
+</div>
+{% if page.paginator.num_pages > 1 %}
+<div class="bar" style="justify-content:center">
+{% if page.has_previous %}<a class="btn sm" href="?{{ qs }}{% if qs %}&{% endif %}page={{ page.previous_page_number }}">← Oldingi</a>{% endif %}
+<span class="muted">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+{% if page.has_next %}<a class="btn sm" href="?{{ qs }}{% if qs %}&{% endif %}page={{ page.next_page_number }}">Keyingi →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

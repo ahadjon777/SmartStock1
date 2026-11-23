@@ -45,3 +45,12 @@ Veb-dastur ham bir xil o'zgaruvchilar bilan ishga tushirilsa, texnika chiqarilga
 
 ## QR yorliqlarni chop etish
 Admin sifatida kirib `/labels/` sahifasini oching: ombor yoki kod boshlanishi bo'yicha filtrlab, "Chop etish" bosiladi (bir sahifada 500 tagacha).
+
+## Admin panel (`/panel/`)
+- **Bosh sahifa:** jami texnika, hozir tadbirda, bugungi chiqish/qaytish, omborlar kesimi, so'nggi harakatlar
+- **Tadbirda:** kim jami olgan, kimga biriktirilgan, hudud, qancha vaqtdan beri (qidiruv bilan)
+- **Texnika:** qidirish/filtr, qo'shish, tahrirlash, Excel yuklash, QR yorliqlar
+- **Omborlar** va **Xodimlar** (faqat admin): yaratish, mas'ul biriktirish, parol, faollik
+
+Rollar: *Admin* (`is_staff`) hamma narsani ko'radi; *Ombor mas'uli* faqat o'z omborlarini ko'radi va faqat shu ombor texnikasini skanerlay oladi; oddiy *xodim* faqat skaner va biriktirishdan foydalanadi.
+Yangilanishdan keyin: `git pull`, `pip install -r requirements.txt`, `python manage.py migrate`.

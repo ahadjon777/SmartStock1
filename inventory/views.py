@@ -12,6 +12,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from .access import is_restricted, managed_warehouses
 from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
 
@@ -46,6 +47,9 @@ def scan_api(request):
             item = Equipment.objects.select_for_update().get(code=code)
         except Equipment.DoesNotExist:
             return JsonResponse({"ok": False, "error": "Bunday QR kodli texnika topilmadi"}, status=404)
+
+        if is_restricted(request.user) and not managed_warehouses(request.user).filter(pk=item.warehouse_id).exists():
+            return JsonResponse({"ok": False, "error": "Bu texnika sizning omboringizga tegishli emas"}, status=403)
 
         if item.status == Equipment.Status.IN_STOCK:
             taken_by = (data.get("taken_by") or "").strip()

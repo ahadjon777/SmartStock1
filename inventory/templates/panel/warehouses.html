@@ -1,0 +1,15 @@
+{% extends "panel/base.html" %}
+{% block panel %}
+<div class="bar"><a class="btn sm" href="{% url 'panel_warehouse_new' %}">+ Yangi ombor</a></div>
+<div class="card tw">
+<table>
+<tr><th>Ombor</th><th>Mas'ul xodim</th><th>Jami</th><th>Tadbirda</th><th></th></tr>
+{% for w in rows %}<tr>
+<td>{{ w.name }}</td>
+<td>{% if w.manager %}{{ w.manager.first_name|default:w.manager.username }}{% else %}<span class="muted">biriktirilmagan</span>{% endif %}</td>
+<td>{{ w.total }}</td><td>{{ w.out }}</td>
+<td><a class="l" href="{% url 'panel_warehouse_edit' w.pk %}">Tahrirlash</a></td>
+</tr>{% empty %}<tr><td colspan="5" class="muted">Ombor yo'q</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

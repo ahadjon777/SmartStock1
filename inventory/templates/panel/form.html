@@ -1,0 +1,18 @@
+{% extends "panel/base.html" %}
+{% block panel %}
+<div class="card">
+<h3 style="margin-top:0">{{ title }}</h3>
+<form method="post">{% csrf_token %}
+{% for f in form %}
+<div class="fld">
+<label for="{{ f.id_for_label }}">{{ f.label }}</label>
+{{ f }}
+{{ f.errors }}
+</div>
+{% endfor %}
+{{ form.non_field_errors }}
+<button type="submit">Saqlash</button>
+<p><a class="l" href="{% url back %}">← Orqaga</a></p>
+</form>
+</div>
+{% endblock %}

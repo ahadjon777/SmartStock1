@@ -1,0 +1,30 @@
+{% extends "panel/base.html" %}
+{% block panel %}
+<div class="grid4">
+<div class="card"><div class="num">{{ total }}</div><span class="muted">Jami texnika</span></div>
+<div class="card"><div class="num">{{ out }}</div><span class="muted">Hozir tadbirda</span></div>
+<div class="card"><div class="num">{{ today_out }}</div><span class="muted">Bugun chiqarilgan</span></div>
+<div class="card"><div class="num">{{ today_in }}</div><span class="muted">Bugun qaytarilgan</span></div>
+</div>
+
+<div class="card tw">
+<b>Omborlar</b>
+<table>
+<tr><th>Ombor</th><th>Jami</th><th>Tadbirda</th></tr>
+{% for w in warehouses %}<tr><td>{{ w.name }}</td><td>{{ w.total }}</td><td>{{ w.out }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">Ombor yo'q</td></tr>{% endfor %}
+</table>
+</div>
+
+<div class="card tw">
+<b>So'nggi harakatlar</b>
+<table>
+<tr><th>Texnika</th><th>Olgan</th><th>Chiqdi</th><th>Qaytdi</th></tr>
+{% for m in recent %}<tr>
+<td>{{ m.equipment.code }} <span class="muted">{{ m.equipment.name }}</span></td>
+<td>{{ m.taken_by }}</td>
+<td>{{ m.out_at|date:"d.m H:i" }}</td>
+<td>{% if m.in_at %}{{ m.in_at|date:"d.m H:i" }}{% else %}<span class="tag o">tadbirda</span>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="4" class="muted">Harakat hali yo'q</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

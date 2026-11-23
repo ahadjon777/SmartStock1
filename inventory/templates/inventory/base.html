@@ -24,15 +24,17 @@ td,th{padding:10px 6px;border-bottom:1px solid var(--line);text-align:left}
 .tabs a{padding:8px 12px;border:1px solid var(--line);border-radius:99px;color:var(--m);text-decoration:none;font-size:.9rem}
 .tabs a.on{background:var(--a);color:#fff;border-color:var(--a)}
 </style>
+{% block head %}{% endblock %}
 </head>
 <body>
 <div class="w">
 <nav>
 <span class="logo">SmartStock</span>
 {% if user.is_authenticated %}
-<span><a href="{% url 'scan' %}">Skaner</a> &nbsp; <a href="{% url 'assign' %}">Biriktirish</a> &nbsp; <a href="{% url 'dashboard' %}">Statistika</a> &nbsp; <a href="{% url 'admin:index' %}">Admin</a></span>
+<span><a href="{% url 'scan' %}">Skaner</a> &nbsp; <a href="{% url 'assign' %}">Biriktirish</a> &nbsp; <a href="{% url 'dashboard' %}">Statistika</a>{% if user.is_staff or user.is_superuser or user.warehouse_set.exists %} &nbsp; <a href="{% url 'panel_home' %}">Panel</a>{% endif %}</span>
 {% endif %}
 </nav>
+{% for m in messages %}<div class="msg {% if m.tags == 'error' %}err{% else %}ok{% endif %}" style="margin-bottom:12px">{{ m }}</div>{% endfor %}
 {% block content %}{% endblock %}
 </div>
 </body>

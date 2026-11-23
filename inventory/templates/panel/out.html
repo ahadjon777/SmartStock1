@@ -1,0 +1,20 @@
+{% extends "panel/base.html" %}
+{% block panel %}
+<form method="get" class="bar">
+<input name="q" value="{{ q }}" placeholder="Kod, nomi yoki F.I.Sh. bo'yicha qidirish">
+<button class="sm">Qidirish</button>
+</form>
+<div class="card tw">
+<b>Hozir tadbirda: {{ rows|length }} ta</b>
+<table>
+<tr><th>Texnika</th><th>Jami olgan</th><th>Biriktirilgan</th><th>Hudud</th><th>Qancha vaqt</th></tr>
+{% for m in rows %}<tr>
+<td>{{ m.equipment.code }} <span class="muted">{{ m.equipment.name }}</span></td>
+<td>{{ m.taken_by }}</td>
+<td>{% if m.holder %}{{ m.holder }}{% else %}<span class="muted">biriktirilmagan</span>{% endif %}</td>
+<td>{{ m.get_region_display }}</td>
+<td>{{ m.since }}</td>
+</tr>{% empty %}<tr><td colspan="5" class="muted">Hozir tadbirda texnika yo'q</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}
