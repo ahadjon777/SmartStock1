@@ -1,0 +1,95 @@
+import json
+from datetime import timedelta
+from collections import defaultdict
+from decimal import Decimal
+
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from .models import Equipment, Movement, Region
+
+PERIODS = {
+    "week": ("Hafta", 7),
+    "month": ("Oy", 30),
+    "quarter": ("Chorak", 90),
+    "half": ("Yarim yil", 182),
+    "year": ("Yil", 365),
+}
+
+
+@login_required
+def scan(request):
+    return render(request, "inventory/scan.html", {"regions": Region.choices})
+
+
+@login_required
+@require_POST
+def scan_api(request):
+    """QR skanerlanganda: omborda bo'lsa chiqaradi, tadbirda bo'lsa qaytaradi."""
+    try:
+        data = json.loads(request.body)
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Noto'g'ri so'rov"}, status=400)
+
+    code = (data.get("code") or "").strip()
+    now = timezone.now()
+
+    with transaction.atomic():
+        try:
+            item = Equipment.objects.select_for_update().get(code=code)
+        except Equipment.DoesNotExist:
+            return JsonResponse({"ok": False, "error": "Bunday QR kodli texnika topilmadi"}, status=404)
+
+        if item.status == Equipment.Status.IN_STOCK:
+            taken_by = (data.get("taken_by") or "").strip()
+            region = data.get("region")
+            if not taken_by or region not in Region.values:
+                return JsonResponse({"ok": False, "error": "F.I.Sh. va hududni kiriting"}, status=400)
+            Movement.objects.create(
+                equipment=item, issued_by=request.user, taken_by=taken_by,
+                region=region, event=(data.get("event") or "").strip(), out_at=now,
+            )
+            item.status = Equipment.Status.OUT
+            item.save(update_fields=["status"])
+            return JsonResponse({"ok": True, "action": "out", "message": f"{item.name} chiqarildi"})
+
+        movement = item.movements.filter(in_at__isnull=True).first()
+        if movement:
+            movement.in_at = now
+            movement.save(update_fields=["in_at"])
+        item.status = Equipment.Status.IN_STOCK
+        item.save(update_fields=["status"])
+        return JsonResponse({"ok": True, "action": "in", "message": f"{item.name} qaytarildi"})
+
+
+@login_required
+def dashboard(request):
+    key = request.GET.get("period", "month")
+    if key not in PERIODS:
+        key = "month"
+    since = timezone.now() - timedelta(days=PERIODS[key][1])
+
+    sums = defaultdict(lambda: [Decimal("0"), 0])
+    qs = Movement.objects.filter(in_at__isnull=False, in_at__gte=since).select_related("equipment")
+    for m in qs:
+        s = sums[m.region]
+        s[0] += m.work_hours
+        s[1] += 1
+
+    rows = []
+    for value, label in Region.choices:
+        total, count = sums.get(value, [Decimal("0"), 0])
+        avg = (total / count).quantize(Decimal("0.01")) if count else Decimal("0")
+        rows.append({"region": label, "count": count, "avg": avg})
+
+    return render(request, "inventory/dashboard.html", {
+        "rows": rows,
+        "periods": [(k, v[0]) for k, v in PERIODS.items()],
+        "current": key,
+        "out_now": Equipment.objects.filter(status=Equipment.Status.OUT).count(),
+        "total": Equipment.objects.count(),
+    })

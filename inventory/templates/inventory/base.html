@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}SmartStock{% endblock %}</title>
+<style>
+:root{--bg:#07090f;--card:#111626;--line:#232a45;--t:#eef1ff;--m:#9aa3c7;--a:#7c5cff;--b:#00e0c6}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
+.w{max-width:640px;margin:auto;padding:16px}
+nav{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:6px 0 16px}
+nav a{color:var(--m);text-decoration:none}
+.logo{font-weight:800;color:var(--t)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px}
+input,select{width:100%;padding:13px;margin:6px 0 12px;border-radius:12px;border:1px solid var(--line);background:#0b0f1d;color:var(--t);font-size:1rem}
+button,.btn{display:inline-block;width:100%;padding:14px;border:0;border-radius:14px;font-weight:700;font-size:1rem;color:#fff;background:linear-gradient(135deg,var(--a),#ff4fa3);cursor:pointer;text-decoration:none;text-align:center}
+table{width:100%;border-collapse:collapse}
+td,th{padding:10px 6px;border-bottom:1px solid var(--line);text-align:left}
+.msg{padding:12px;border-radius:12px;margin-top:10px}
+.ok{background:#00e0c622;color:var(--b)}
+.err{background:#ff4f4f22;color:#ff8a8a}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs a{padding:8px 12px;border:1px solid var(--line);border-radius:99px;color:var(--m);text-decoration:none;font-size:.9rem}
+.tabs a.on{background:var(--a);color:#fff;border-color:var(--a)}
+</style>
+</head>
+<body>
+<div class="w">
+<nav>
+<span class="logo">SmartStock</span>
+{% if user.is_authenticated %}
+<span><a href="{% url 'scan' %}">Skaner</a> &nbsp; <a href="{% url 'dashboard' %}">Statistika</a> &nbsp; <a href="{% url 'admin:index' %}">Admin</a></span>
+{% endif %}
+</nav>
+{% block content %}{% endblock %}
+</div>
+</body>
+</html>

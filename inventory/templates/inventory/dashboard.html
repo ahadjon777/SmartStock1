@@ -1,0 +1,16 @@
+{% extends "inventory/base.html" %}
+{% block title %}Statistika{% endblock %}
+{% block content %}
+<div class="card">
+<b>Jami texnika:</b> {{ total }} &nbsp; <b>Hozir tadbirda:</b> {{ out_now }}
+</div>
+<div class="tabs">
+{% for key, label in periods %}<a href="?period={{ key }}" class="{% if key == current %}on{% endif %}">{{ label }}</a>{% endfor %}
+</div>
+<div class="card">
+<table>
+<tr><th>Hudud</th><th>Soni</th><th>O'rtacha soat</th></tr>
+{% for r in rows %}<tr><td>{{ r.region }}</td><td>{{ r.count }}</td><td>{{ r.avg }}</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}
