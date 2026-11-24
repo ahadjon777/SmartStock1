@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import panel, views
+from . import admin_actions, panel, views
 
 urlpatterns = [
     path("", views.scan, name="scan"),
@@ -18,6 +18,7 @@ urlpatterns = [
     path("panel/equipment/", panel.equipment_list, name="panel_equipment"),
     path("panel/equipment/bulk/", panel.equipment_bulk, name="panel_equipment_bulk"),
     path("panel/equipment/new/", panel.equipment_edit, name="panel_equipment_new"),
+    path("panel/equipment/<int:pk>/delete/", admin_actions.equipment_delete, name="panel_equipment_delete"),
     path("panel/equipment/<int:pk>/", panel.equipment_edit, name="panel_equipment_edit"),
     path("panel/import/", panel.import_excel, name="panel_import"),
     path("panel/warehouses/", panel.warehouse_list, name="panel_warehouses"),
