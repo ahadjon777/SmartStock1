@@ -58,3 +58,21 @@ Admin sifatida kirib `/labels/` sahifasini oching: ombor yoki kod boshlanishi bo
 
 Rollar: *Admin* (`is_staff`) hamma narsani ko'radi; *Ombor mas'uli* faqat o'z omborlarini ko'radi va faqat shu ombor texnikasini skanerlay oladi; oddiy *xodim* faqat skaner va biriktirishdan foydalanadi.
 Yangilanishdan keyin: `git pull`, `pip install -r requirements.txt`, `python manage.py migrate`.
+
+## Xavfsizlik monitoringi
+Dastur o'ziga qilingan hujumni aniqlaydi, Telegram'ga ogohlantirish yuboradi va xabar ostidagi tugmalar bilan choralar ko'riladi.
+
+**Nimani aniqlaydi:**
+- Parol tanlash (bitta IP'dan 5 daqiqada 5+ xato) va bitta akkauntga turli IP'lardan urinishlar (10 daqiqada 8+)
+- Admin akkauntiga yangi IP'dan kirish
+- Skanerlash (bitta IP'dan 1 daqiqada 30+ mavjud bo'lmagan/taqiqlangan sahifa)
+
+**Tugmalar:** 🚫 IP'ni bloklash, 🔒 akkauntni qulflash, 🛑 Lockdown (faqat superuserlar ishlay oladi), ✅ ko'rib chiqdim.
+**Bot buyruqlari:** `/xavf` (so'nggi hodisalar), `/bloklar` (bloklangan IP'lar, ochish tugmasi bilan), `/lockdown on|off`.
+
+**Xavfsizlik himoyalari:** yagona faol superuser qulflanmaydi; `SECURITY_ALLOWLIST_IPS` dagi IP'lar bloklanmaydi.
+**O'zingizni bloklab qo'ysangiz:** `python manage.py unblock_ip all` yoki `python manage.py lockdown off`.
+**Sinash:** `python manage.py simulate_attack` soxta hujum yaratadi (haqiqiy odamga tegmaydi).
+
+**Sozlamalar (ixtiyoriy):** `SECURITY_ALLOWLIST_IPS`, `SECURITY_FAIL_LIMIT`, `SECURITY_USER_FAIL_LIMIT`, `SECURITY_SCAN_LIMIT`.
+Proksi (nginx, cloudflared, ngrok) orqasida ishlasangiz `TRUST_X_FORWARDED_FOR=1` qo'ying, aks holda hamma so'rov bitta IP'dan ko'rinadi. Proksisiz bu o'zgaruvchini yoqmang.

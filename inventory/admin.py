@@ -20,3 +20,18 @@ class MovementAdmin(admin.ModelAdmin):
     list_display = ("equipment", "taken_by", "region", "out_at", "in_at", "work_hours")
     list_filter = ("region",)
     search_fields = ("equipment__code", "taken_by", "event")
+
+
+from .models import BlockedIP, SecurityEvent  # noqa: E402
+
+
+@admin.register(SecurityEvent)
+class SecurityEventAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "kind", "ip", "username", "detail", "handled")
+    list_filter = ("kind", "handled")
+    search_fields = ("ip", "username")
+
+
+@admin.register(BlockedIP)
+class BlockedIPAdmin(admin.ModelAdmin):
+    list_display = ("ip", "reason", "created_at")

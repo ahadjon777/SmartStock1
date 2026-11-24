@@ -85,3 +85,39 @@ class Movement(models.Model):
 
     def __str__(self):
         return f"{self.equipment} -> {self.taken_by}"
+
+
+class SecurityEvent(models.Model):
+    kind = models.CharField("Turi", max_length=30, db_index=True)
+    ip = models.GenericIPAddressField("IP", null=True, blank=True)
+    username = models.CharField("Login", max_length=150, blank=True)
+    detail = models.CharField("Tafsilot", max_length=300, blank=True)
+    created_at = models.DateTimeField("Vaqt", auto_now_add=True, db_index=True)
+    handled = models.BooleanField("Ko'rib chiqildi", default=False)
+
+    class Meta:
+        verbose_name = "Xavfsizlik hodisasi"
+        verbose_name_plural = "Xavfsizlik hodisalari"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.kind} {self.ip or ''} {self.username}"
+
+
+class BlockedIP(models.Model):
+    ip = models.GenericIPAddressField("IP", unique=True)
+    reason = models.CharField("Sabab", max_length=200, blank=True)
+    created_at = models.DateTimeField("Bloklangan vaqt", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Bloklangan IP"
+        verbose_name_plural = "Bloklangan IP'lar"
+
+    def __str__(self):
+        return self.ip
+
+
+class SecurityState(models.Model):
+    """Bitta qatorli sozlama: lockdown (favqulodda yopish) rejimi."""
+    lockdown = models.BooleanField("Lockdown", default=False)
+    updated_at = models.DateTimeField(auto_now=True)

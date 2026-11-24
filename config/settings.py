@@ -25,6 +25,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "inventory.middleware.ThreatMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -63,6 +64,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_IDS = [int(i) for i in os.environ.get("TELEGRAM_ADMIN_IDS", "").split(",") if i.strip()]
+
+# Xavfsizlik: faqat bitta ishonchli proksi (nginx, cloudflared, ngrok) orqasida TRUST_X_FORWARDED_FOR=1 qiling
+TRUST_X_FORWARDED_FOR = os.environ.get("TRUST_X_FORWARDED_FOR", "0") == "1"
+SECURITY_ALLOWLIST_IPS = [i.strip() for i in os.environ.get("SECURITY_ALLOWLIST_IPS", "").split(",") if i.strip()]
+SECURITY_FAIL_LIMIT = int(os.environ.get("SECURITY_FAIL_LIMIT", "5"))        # bitta IP: 5 daqiqada
+SECURITY_USER_FAIL_LIMIT = int(os.environ.get("SECURITY_USER_FAIL_LIMIT", "8"))  # bitta login: 10 daqiqada
+SECURITY_SCAN_LIMIT = int(os.environ.get("SECURITY_SCAN_LIMIT", "30"))       # bitta IP: 1 daqiqada 403/404
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "scan"
