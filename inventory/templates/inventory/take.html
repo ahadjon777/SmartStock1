@@ -1,0 +1,46 @@
+{% extends "inventory/base.html" %}
+{% block title %}Biriktirish{% endblock %}
+{% block content %}
+<div class="card">
+<b>{{ me }}</b>
+<p style="color:var(--m)">O'zingizga beriladigan texnikalarning QR kodini skanerlang. F.I.Sh. avtomatik yoziladi.</p>
+<div id="reader" style="width:100%"></div>
+<button id="start" type="button">Kamerani yoqish</button>
+<input id="manual" placeholder="Kamera ishlamasa kodni yozing" style="margin-top:10px">
+<button id="add" type="button" style="background:#232a45">Biriktirish</button>
+<div id="out"></div>
+</div>
+
+<div class="card">
+<b>Menda: <span id="count">0</span> ta</b>
+<div id="list" style="color:var(--m)"></div>
+</div>
+{% csrf_token %}
+{{ mine|json_script:"mine" }}
+{% include "inventory/_scanner.html" %}
+<script>
+const out = document.getElementById('out'), list = document.getElementById('list');
+let busy = false;
+function draw(items) {
+  list.innerHTML = '';
+  items.forEach(it => { const row = document.createElement('div'); row.className = 'row'; row.textContent = it.code + ' — ' + it.name; list.append(row); });
+  document.getElementById('count').textContent = items.length;
+}
+draw(JSON.parse(document.getElementById('mine').textContent));
+
+async function take(code, force) {
+  if (busy) return;
+  busy = true;
+  try {
+    let d = await postJSON("{% url 'take_api' %}", {code, force: !!force});
+    if (d.confirm && confirm(d.error + '. O\'zingizga ko\'chirasizmi?')) {
+      d = await postJSON("{% url 'take_api' %}", {code, force: true});
+    }
+    showMsg(out, d.ok, d.ok ? d.message : d.error);
+    if (d.mine) draw(d.mine);
+  } finally { busy = false; }
+}
+initScanner(c => take(c));
+document.getElementById('add').onclick = () => { const v = document.getElementById('manual').value.trim(); if (v) { take(v); document.getElementById('manual').value = ''; } };
+</script>
+{% endblock %}

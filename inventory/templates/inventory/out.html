@@ -1,0 +1,42 @@
+{% extends "inventory/base.html" %}
+{% block title %}Chiqarish{% endblock %}
+{% block content %}
+<div class="card">
+<b>Ombordan chiqarish</b>
+<p style="color:var(--m)">Hamma texnikani ketma-ket skanerlang, oxirida "Chiqarish" ni bosing.</p>
+<div id="reader" style="width:100%"></div>
+<button id="start" type="button">Kamerani yoqish</button>
+</div>
+
+<div class="card">
+<b>Skanerlangan: <span id="count">0</span> ta</b>
+<div id="list"></div>
+<input id="manual" placeholder="Kamera ishlamasa kodni yozing" style="margin-top:10px">
+<button id="add" type="button" style="background:#232a45;margin-bottom:12px">Qo'shish</button>
+<label>Hudud</label>
+<select id="region">{% for value, label in regions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+<label>Tadbir (ixtiyoriy)</label>
+<input id="event" placeholder="Tadbir nomi">
+<button id="send" type="button">Chiqarish</button>
+<div id="out"></div>
+</div>
+{% csrf_token %}
+{% include "inventory/_scanner.html" %}
+<script>
+const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
+const redraw = () => renderCart(list, count, codes, redraw);
+function add(c) { if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
+initScanner(add);
+document.getElementById('add').onclick = () => { add(document.getElementById('manual').value.trim()); document.getElementById('manual').value = ''; };
+document.getElementById('send').onclick = async () => {
+  const d = await postJSON("{% url 'checkout_api' %}", {
+    codes, region: document.getElementById('region').value, event: document.getElementById('event').value
+  });
+  let text = d.ok ? d.message : d.error;
+  const bad = (d.skipped || []).map(s => s.code);
+  if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
+  showMsg(out, d.ok, text);
+  if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+};
+</script>
+{% endblock %}

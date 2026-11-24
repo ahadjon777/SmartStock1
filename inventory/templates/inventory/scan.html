@@ -1,57 +1,9 @@
 {% extends "inventory/base.html" %}
-{% block title %}Skaner{% endblock %}
+{% block title %}SmartStock{% endblock %}
 {% block content %}
-<div class="card">
-<div id="reader" style="width:100%"></div>
-<button id="start" type="button">Kamerani yoqish</button>
-</div>
-
-<div class="card">
-<label>QR kod (kamera ishlamasa qo'lda kiriting)</label>
-<input id="code" placeholder="Masalan: SS-00001">
-<label>Olgan shaxs F.I.Sh. (faqat chiqarishda)</label>
-<input id="taken_by" placeholder="Familiya Ism Sharif">
-<label>Hudud</label>
-<select id="region">
-{% for value, label in regions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-</select>
-<label>Tadbir (ixtiyoriy)</label>
-<input id="event" placeholder="Tadbir nomi">
-<button id="send" type="button">Yuborish</button>
-<div id="out"></div>
-</div>
-
-{% csrf_token %}
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script>
-const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-const out = document.getElementById('out');
-function show(ok, text){ out.innerHTML = '<div class="msg '+(ok?'ok':'err')+'"></div>'; out.firstChild.textContent = text; }
-
-async function send(){
-  const res = await fetch("{% url 'scan_api' %}", {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-CSRFToken':csrf},
-    body: JSON.stringify({
-      code: document.getElementById('code').value,
-      taken_by: document.getElementById('taken_by').value,
-      region: document.getElementById('region').value,
-      event: document.getElementById('event').value
-    })
-  });
-  const d = await res.json();
-  show(d.ok, d.ok ? d.message : d.error);
-  if (d.ok) { document.getElementById('code').value = ''; }
-}
-document.getElementById('send').onclick = send;
-
-let scanner;
-document.getElementById('start').onclick = () => {
-  scanner = new Html5Qrcode('reader');
-  scanner.start({facingMode:'environment'}, {fps:10, qrbox:220}, text => {
-    document.getElementById('code').value = text;
-    scanner.stop();
-  }).catch(e => show(false, 'Kameraga ruxsat berilmadi'));
-};
-</script>
+<div class="card"><b>{{ me }}</b><br><span style="color:var(--m)">Nima qilmoqchisiz?</span></div>
+<a class="btn" href="{% url 'checkout' %}" style="margin-bottom:12px">📤 Ombordan chiqarish</a>
+<a class="btn" href="{% url 'take' %}" style="margin-bottom:12px">📌 Texnikani o'zimga biriktirish</a>
+<a class="btn" href="{% url 'checkin' %}" style="margin-bottom:12px">📥 Omborga qaytarish</a>
+<a class="btn" href="{% url 'progress' %}" style="background:#232a45">📋 Jarayon (kimga biriktirilgan)</a>
 {% endblock %}

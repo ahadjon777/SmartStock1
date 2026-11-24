@@ -1,0 +1,15 @@
+{% extends "inventory/base.html" %}
+{% block title %}Jarayon{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="15">{% endblock %}
+{% block content %}
+{% for g in groups %}
+<div class="card">
+<b>{{ g.leader }}</b>
+<div style="font-size:1.6rem;font-weight:800;margin:6px 0">{{ g.assigned }} / {{ g.total }} <span style="font-size:.9rem;color:var(--m)">biriktirildi, {{ g.left }} ta qoldi</span></div>
+{% for m in g.rows %}<div class="row"><span>{{ m.equipment.code }} {{ m.equipment.name }}</span><span style="color:{% if m.holder %}var(--b){% else %}#ffb86b{% endif %}">{% if m.holder %}{{ m.holder }}{% else %}biriktirilmagan{% endif %}</span></div>{% endfor %}
+</div>
+{% empty %}
+<div class="card" style="color:var(--m)">Hozir tadbirda texnika yo'q.</div>
+{% endfor %}
+<p style="color:var(--m);font-size:.85rem">Sahifa har 15 soniyada yangilanadi.</p>
+{% endblock %}

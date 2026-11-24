@@ -1,0 +1,44 @@
+{% extends "inventory/base.html" %}
+{% block title %}Qaytarish{% endblock %}
+{% block content %}
+<div class="card">
+<b>Omborga qaytarish</b>
+<p style="color:var(--m)">Qaytayotgan hamma texnikani skanerlang, oxirida "Qaytarish" ni bosing.</p>
+<div id="reader" style="width:100%"></div>
+<button id="start" type="button">Kamerani yoqish</button>
+</div>
+
+<div class="card">
+<b>Skanerlangan: <span id="count">0</span> ta</b>
+<div id="list"></div>
+<input id="manual" placeholder="Kamera ishlamasa kodni yozing" style="margin-top:10px">
+<button id="add" type="button" style="background:#232a45;margin-bottom:12px">Qo'shish</button>
+<button id="send" type="button">Qaytarish</button>
+<div id="out"></div>
+<div id="missing"></div>
+</div>
+{% csrf_token %}
+{% include "inventory/_scanner.html" %}
+<script>
+const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
+const redraw = () => renderCart(list, count, codes, redraw);
+function add(c) { if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
+initScanner(add);
+document.getElementById('add').onclick = () => { add(document.getElementById('manual').value.trim()); document.getElementById('manual').value = ''; };
+document.getElementById('send').onclick = async () => {
+  const d = await postJSON("{% url 'checkin_api' %}", {codes});
+  let text = d.ok ? d.message : d.error;
+  const bad = (d.skipped || []).map(s => s.code);
+  if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
+  showMsg(out, d.ok, text);
+  const box = document.getElementById('missing'); box.innerHTML = '';
+  if (d.missing && d.missing.length) {
+    const h = document.createElement('div'); h.className = 'msg err'; h.style.marginTop = '10px';
+    h.textContent = 'Hali qaytmagan: ' + d.missing.length + ' ta';
+    box.append(h);
+    d.missing.forEach(m => { const row = document.createElement('div'); row.className = 'row'; row.textContent = m.code + ' ' + m.name + ' → ' + m.holder; box.append(row); });
+  }
+  if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+/* Kamera to'xtamaydi: ketma-ket skanerlanadi. Bir xil kod 2.5 soniya ichida takrorlansa e'tiborga olinmaydi. */
+function initScanner(onCode) {
+  const btn = document.getElementById('start');
+  let last = '', lastAt = 0;
+  btn.onclick = () => {
+    const sc = new Html5Qrcode('reader');
+    sc.start({facingMode: 'environment'}, {fps: 10, qrbox: 220}, text => {
+      const now = Date.now();
+      const same = text === last && now - lastAt < 2500;
+      last = text; lastAt = now;
+      if (same) return;
+      if (navigator.vibrate) navigator.vibrate(60);
+      onCode(text.trim());
+    }).then(() => { btn.style.display = 'none'; })
+      .catch(() => alert('Kameraga ruxsat berilmadi. Kodni qo\'lda kiritishingiz mumkin.'));
+  };
+}
+function postJSON(url, body) {
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify(body)})
+    .then(r => r.json());
+}
+function showMsg(el, ok, text) {
+  el.innerHTML = '<div class="msg ' + (ok ? 'ok' : 'err') + '"></div>';
+  el.firstChild.textContent = text;
+}
+function renderCart(listEl, countEl, codes, rerender) {
+  listEl.innerHTML = '';
+  codes.forEach((c, i) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const s = document.createElement('span'); s.textContent = c;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = '✕';
+    b.onclick = () => { codes.splice(i, 1); rerender(); };
+    row.append(s, b); listEl.append(row);
+  });
+  countEl.textContent = codes.length;
+}
+</script>

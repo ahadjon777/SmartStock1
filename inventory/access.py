@@ -1,6 +1,11 @@
 from .models import Warehouse
 
 
+def display_name(user):
+    """Xodimning F.I.Sh.'i (profilida yozilgan), bo'lmasa login."""
+    return (user.first_name or "").strip() or user.username
+
+
 def is_admin(user):
     return user.is_authenticated and (user.is_superuser or user.is_staff)
 

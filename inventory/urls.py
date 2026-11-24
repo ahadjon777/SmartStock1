@@ -4,10 +4,14 @@ from . import panel, views
 
 urlpatterns = [
     path("", views.scan, name="scan"),
-    path("api/scan/", views.scan_api, name="scan_api"),
+    path("out/", views.checkout, name="checkout"),
+    path("api/checkout/", views.checkout_api, name="checkout_api"),
+    path("take/", views.take, name="take"),
+    path("api/take/", views.take_api, name="take_api"),
+    path("in/", views.checkin, name="checkin"),
+    path("api/checkin/", views.checkin_api, name="checkin_api"),
+    path("progress/", views.progress, name="progress"),
     path("labels/", views.labels, name="labels"),
-    path("assign/", views.assign, name="assign"),
-    path("api/assign/", views.assign_api, name="assign_api"),
     path("stats/", views.dashboard, name="dashboard"),
     path("panel/", panel.home, name="panel_home"),
     path("panel/out/", panel.out_now, name="panel_out"),

@@ -29,8 +29,12 @@ python manage.py import_excel texnikalar.xlsx
 ## Eslatma
 Kamera brauzerda faqat HTTPS (yoki localhost) orqali ishlaydi.
 
-## Biriktirish oqimi
-Javobgar ombordan texnikalarni skanerlab oladi (`/`), tadbir joyida har bir xodimga `/assign/` sahifasida biriktiradi (kodlarni skanerlab, F.I.Sh. kiritiladi).
+## Ish oqimi
+Har bir xodim o'z login'i bilan o'z telefonidan kiradi (login va F.I.Sh. `/panel/staff/` da admin tomonidan yaratiladi). F.I.Sh. har doim profildan avtomatik olinadi.
+1. **Chiqarish** (`/out/`): javobgar ombordagi hamma texnikani ketma-ket skanerlaydi, hudud va tadbirni tanlab, bitta "Chiqarish" bosadi.
+2. **Biriktirish** (`/take/`): tadbir joyida har bir xodim o'z telefonida o'ziga tegishli 2-4 ta texnikani skanerlaydi. Texnika boshqa xodimga biriktirilgan bo'lsa, ko'chirishni so'raydi.
+3. **Jarayon** (`/progress/`): javobgar "20 tadan 14 tasi biriktirildi, 6 tasi qoldi" ni ko'radi (har 15 soniyada yangilanadi).
+4. **Qaytarish** (`/in/`): hamma texnika skanerlanib, bitta "Qaytarish" bosiladi; qaytmagan texnikalar kimda ekani bilan ko'rsatiladi.
 
 ## Telegram admin bot
 1. @BotFather orqali bot yarating, tokenni oling. O'z ID'ingizni bilish uchun botga `/start` yozing.
