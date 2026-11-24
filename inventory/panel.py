@@ -3,9 +3,10 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import redirect_to_login
-from django.core.exceptions import PermissionDenied, ProtectedError
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -53,7 +54,6 @@ def human(delta):
 
 
 def sort_context(request, allowed):
-    """Build safe sortable links using an explicit field allowlist."""
     current = request.GET.get("sort", "")
     direction = request.GET.get("direction", "asc")
     if direction not in SORT_DIRECTIONS:
@@ -90,49 +90,32 @@ def home(request):
     mv = Movement.objects.filter(equipment__warehouse__in=wh)
     today = timezone.localdate()
     return render_panel(request, "panel/home.html", "home", {
-        "total": eq.count(),
-        "out": eq.filter(status=Equipment.Status.OUT).count(),
-        "today_out": mv.filter(out_at__date=today).count(),
-        "today_in": mv.filter(in_at__date=today).count(),
-        "warehouses": wh.annotate(
-            total=Count("equipment"),
-            out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT)),
-        ),
+        "total": eq.count(), "out": eq.filter(status=Equipment.Status.OUT).count(),
+        "today_out": mv.filter(out_at__date=today).count(), "today_in": mv.filter(in_at__date=today).count(),
+        "warehouses": wh.annotate(total=Count("equipment"), out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT))),
         "recent": mv.select_related("equipment")[:10],
     })
 
 
 @panel_view()
 def out_now(request):
-    allowed = {
-        "date": "out_at", "person": "taken_by", "code": "equipment__code",
-        "name": "equipment__name", "warehouse": "equipment__warehouse__name",
-    }
-    qs = Movement.objects.filter(
-        in_at__isnull=True, equipment__warehouse__in=scope(request.user),
-    ).select_related("equipment", "equipment__warehouse").order_by("taken_by", "out_at")
+    allowed = {"date": "out_at", "person": "taken_by", "code": "equipment__code", "name": "equipment__name", "warehouse": "equipment__warehouse__name"}
+    qs = Movement.objects.filter(in_at__isnull=True, equipment__warehouse__in=scope(request.user)).select_related("equipment", "equipment__warehouse").order_by("taken_by", "out_at")
     q = request.GET.get("q", "").strip()
     if q:
-        qs = qs.filter(
-            Q(equipment__code__icontains=q) | Q(equipment__name__icontains=q)
-            | Q(taken_by__icontains=q) | Q(holder__icontains=q)
-        )
+        qs = qs.filter(Q(equipment__code__icontains=q) | Q(equipment__name__icontains=q) | Q(taken_by__icontains=q) | Q(holder__icontains=q))
     qs = apply_sort(qs, request, allowed, "date")
     now = timezone.now()
     rows = list(qs)
     for movement in rows:
         movement.since = human(now - movement.out_at)
-    return render_panel(request, "panel/out.html", "out", {
-        "rows": rows, "q": q, **sort_context(request, allowed),
-    })
+    return render_panel(request, "panel/out.html", "out", {"rows": rows, "q": q, **sort_context(request, allowed)})
 
 
 @panel_view()
 def equipment_list(request):
     wh = scope(request.user)
-    allowed = {
-        "code": "code", "name": "name", "warehouse": "warehouse__name", "status": "status",
-    }
+    allowed = {"code": "code", "name": "name", "warehouse": "warehouse__name", "status": "status"}
     qs = Equipment.objects.filter(warehouse__in=wh).select_related("warehouse")
     if request.GET.get("warehouse", "").isdigit():
         qs = qs.filter(warehouse_id=request.GET["warehouse"])
@@ -143,10 +126,7 @@ def equipment_list(request):
         qs = qs.filter(Q(code__icontains=q) | Q(name__icontains=q))
     qs = apply_sort(qs, request, allowed, "code")
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
-    return render_panel(request, "panel/equipment.html", "equipment", {
-        "page": page, "warehouses": wh, "statuses": Equipment.Status.choices,
-        **sort_context(request, allowed),
-    })
+    return render_panel(request, "panel/equipment.html", "equipment", {"page": page, "warehouses": wh, "statuses": Equipment.Status.choices, **sort_context(request, allowed)})
 
 
 @panel_view()
@@ -158,9 +138,7 @@ def equipment_edit(request, pk=None):
         form.save()
         messages.success(request, "Saqlandi")
         return redirect("panel_equipment")
-    return render_panel(request, "panel/form.html", "equipment", {
-        "form": form, "title": "Texnikani tahrirlash" if obj else "Yangi texnika", "back": "panel_equipment",
-    })
+    return render_panel(request, "panel/form.html", "equipment", {"form": form, "title": "Texnikani tahrirlash" if obj else "Yangi texnika", "back": "panel_equipment"})
 
 
 @panel_view(admin_only=True)
@@ -200,22 +178,15 @@ def import_excel(request):
         except Exception as exc:
             messages.error(request, f"Faylni o'qib bo'lmadi: {exc}")
         return redirect("panel_import")
-    return render_panel(request, "panel/import.html", "equipment", {
-        "warehouses": Warehouse.objects.order_by("name"),
-    })
+    return render_panel(request, "panel/import.html", "equipment", {"warehouses": Warehouse.objects.order_by("name")})
 
 
 @panel_view(admin_only=True)
 def warehouse_list(request):
     allowed = {"name": "name", "manager": "manager__username", "total": "total", "out": "out"}
-    rows = Warehouse.objects.select_related("manager").annotate(
-        total=Count("equipment"),
-        out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT)),
-    )
+    rows = Warehouse.objects.select_related("manager").annotate(total=Count("equipment"), out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT)))
     rows = apply_sort(rows, request, allowed, "name")
-    return render_panel(request, "panel/warehouses.html", "warehouses", {
-        "rows": rows, **sort_context(request, allowed),
-    })
+    return render_panel(request, "panel/warehouses.html", "warehouses", {"rows": rows, **sort_context(request, allowed)})
 
 
 @panel_view(admin_only=True)
@@ -226,9 +197,7 @@ def warehouse_edit(request, pk=None):
         form.save()
         messages.success(request, "Saqlandi")
         return redirect("panel_warehouses")
-    return render_panel(request, "panel/form.html", "warehouses", {
-        "form": form, "title": "Omborni tahrirlash" if obj else "Yangi ombor", "back": "panel_warehouses",
-    })
+    return render_panel(request, "panel/form.html", "warehouses", {"form": form, "title": "Omborni tahrirlash" if obj else "Yangi ombor", "back": "panel_warehouses"})
 
 
 @panel_view(admin_only=True)
@@ -245,14 +214,9 @@ def warehouse_delete(request, pk):
 
 @panel_view(admin_only=True)
 def staff_list(request):
-    allowed = {
-        "username": "username", "name": "first_name", "role": "is_staff", "active": "is_active",
-    }
-    users = User.objects.prefetch_related("warehouse_set")
-    users = apply_sort(users, request, allowed, "username")
-    return render_panel(request, "panel/staff.html", "staff", {
-        "users": users, **sort_context(request, allowed),
-    })
+    allowed = {"username": "username", "name": "first_name", "role": "is_staff", "active": "is_active"}
+    users = apply_sort(User.objects.prefetch_related("warehouse_set"), request, allowed, "username")
+    return render_panel(request, "panel/staff.html", "staff", {"users": users, **sort_context(request, allowed)})
 
 
 @panel_view(admin_only=True)
@@ -260,11 +224,7 @@ def staff_edit(request, pk=None):
     obj = get_object_or_404(User, pk=pk) if pk else None
     initial = {}
     if obj:
-        initial = {
-            "username": obj.username, "full_name": obj.first_name,
-            "is_admin": obj.is_staff or obj.is_superuser, "is_active": obj.is_active,
-            "warehouses": Warehouse.objects.filter(manager=obj),
-        }
+        initial = {"username": obj.username, "full_name": obj.first_name, "is_admin": obj.is_staff or obj.is_superuser, "is_active": obj.is_active, "warehouses": Warehouse.objects.filter(manager=obj)}
     form = StaffForm(request.POST or None, initial=initial, user=obj)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
@@ -282,9 +242,7 @@ def staff_edit(request, pk=None):
         Warehouse.objects.filter(pk__in=chosen).update(manager=user)
         messages.success(request, "Saqlandi")
         return redirect("panel_staff")
-    return render_panel(request, "panel/form.html", "staff", {
-        "form": form, "title": "Xodimni tahrirlash" if obj else "Yangi xodim", "back": "panel_staff",
-    })
+    return render_panel(request, "panel/form.html", "staff", {"form": form, "title": "Xodimni tahrirlash" if obj else "Yangi xodim", "back": "panel_staff"})
 
 
 @panel_view(admin_only=True)
