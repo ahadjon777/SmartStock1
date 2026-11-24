@@ -1,5 +1,12 @@
 import asyncio
 
+from aiogram.exceptions import TelegramRetryAfter
+
+try:
+    await dp.start_polling(bot)
+except TelegramRetryAfter as exc:
+    self.stderr.write(f"Telegram cheklovi: {exc.retry_after} soniyadan keyin takrorlang")
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
