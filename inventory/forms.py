@@ -9,7 +9,7 @@ User = get_user_model()
 class EquipmentForm(forms.ModelForm):
     class Meta:
         model = Equipment
-        fields = ("code", "name", "warehouse")
+        fields = ("code", "name", "manufactured_year", "warehouse")
 
     def __init__(self, *args, warehouses=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -26,7 +26,11 @@ class WarehouseForm(forms.ModelForm):
 class StaffForm(forms.Form):
     username = forms.CharField(label="Login", max_length=150)
     full_name = forms.CharField(label="F.I.Sh.", max_length=150, required=False)
-    password = forms.CharField(label="Parol (o'zgartirmasangiz bo'sh qoldiring)", widget=forms.PasswordInput, required=False)
+    password = forms.CharField(
+        label="Parol (o'zgartirmasangiz bo'sh qoldiring)",
+        widget=forms.PasswordInput,
+        required=False,
+    )
     is_admin = forms.BooleanField(label="Admin (hamma narsaga ruxsat)", required=False)
     is_active = forms.BooleanField(label="Faol", required=False, initial=True)
     warehouses = forms.ModelMultipleChoiceField(

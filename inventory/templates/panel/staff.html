@@ -3,15 +3,16 @@
 <div class="bar"><a class="btn sm" href="{% url 'panel_staff_new' %}">+ Yangi xodim</a></div>
 <div class="card tw">
 <table>
-<tr><th>Login</th><th>F.I.Sh.</th><th>Rol</th><th>Omborlar</th><th>Holat</th><th></th></tr>
+<tr><th><a class="l" href="{{ sort_links.username }}">Login ↕</a></th><th><a class="l" href="{{ sort_links.name }}">F.I.Sh. ↕</a></th><th><a class="l" href="{{ sort_links.role }}">Rol ↕</a></th><th>Omborlar</th><th><a class="l" href="{{ sort_links.active }}">Holat ↕</a></th><th>Amallar</th></tr>
 {% for u in users %}<tr>
 <td>{{ u.username }}</td>
 <td>{{ u.first_name }}</td>
 <td>{% if u.is_superuser or u.is_staff %}Admin{% elif u.warehouse_set.all %}Ombor mas'uli{% else %}Xodim{% endif %}</td>
 <td>{% for w in u.warehouse_set.all %}{{ w.name }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">—</span>{% endfor %}</td>
 <td>{% if u.is_active %}<span class="tag g">faol</span>{% else %}<span class="tag">o'chirilgan</span>{% endif %}</td>
-<td><a class="l" href="{% url 'panel_staff_edit' u.pk %}">Tahrirlash</a></td>
-</tr>{% endfor %}
+<td><a class="l" href="{% url 'panel_staff_edit' u.pk %}">Tahrirlash</a>
+{% if not u.is_superuser and u.pk != request.user.pk %}<form method="post" action="{% url 'panel_staff_delete' u.pk %}" style="display:inline" onsubmit="return confirm('Xodim akkauntini o‘chirishni tasdiqlaysizmi?');">{% csrf_token %}<button class="sm" type="submit">O'chirish</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6" class="muted">Xodim yo'q</td></tr>{% endfor %}
 </table>
 </div>
 {% endblock %}

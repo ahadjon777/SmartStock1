@@ -2,8 +2,10 @@
 {% block panel %}
 <div class="card">
 <h3 style="margin-top:0">Excel'dan texnika yuklash</h3>
-<p class="muted">.xlsx fayl: 1-qator sarlavha, ustunlar tartibi: <b>kod | nomi | ombor</b>. Mavjud kodlar yangilanadi, yangi omborlar avtomatik yaratiladi.</p>
+<p class="muted">.xlsx fayl sarlavhalari va tartibi: <b>№ | Texnika nomi | Ishlab chiqarilgan yili | Inventar raqami</b>. Har bir satr bitta texnika. Inventar raqami yagona QR-kod sifatida saqlanadi; mavjud raqamlar yangilanadi.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
+<label for="warehouse">Ombor</label>
+<select id="warehouse" name="warehouse" required><option value="">Omborni tanlang</option>{% for w in warehouses %}<option value="{{ w.pk }}">{{ w.name }}</option>{% endfor %}</select>
 <input type="file" name="file" accept=".xlsx" required>
 <button type="submit">Yuklash</button>
 </form>

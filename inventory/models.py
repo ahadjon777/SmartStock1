@@ -34,6 +34,7 @@ class Equipment(models.Model):
 
     code = models.CharField("QR kod", max_length=64, unique=True)
     name = models.CharField("Nomi", max_length=200)
+    manufactured_year = models.PositiveSmallIntegerField("Ishlab chiqarilgan yili", null=True, blank=True)
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="Ombor")
     status = models.CharField("Holati", max_length=10, choices=Status.choices, default=Status.IN_STOCK)
 
