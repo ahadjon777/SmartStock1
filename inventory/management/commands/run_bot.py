@@ -1,21 +1,12 @@
 import asyncio
 
-from aiogram.exceptions import TelegramRetryAfter
-
-try:
-    await dp.start_polling(bot)
-except TelegramRetryAfter as exc:
-    self.stderr.write(f"Telegram cheklovi: {exc.retry_after} soniyadan keyin takrorlang")
-
 from aiogram import Bot, Dispatcher, F
+from aiogram.exceptions import TelegramRetryAfter
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-
-from inventory import reports, security
-from inventory.models import BlockedIP
 
 
 class Command(BaseCommand):
@@ -110,4 +101,9 @@ class Command(BaseCommand):
                 pass
 
         self.stdout.write("Bot ishga tushdi")
-        await dp.start_polling(bot)
+        try:
+            await dp.start_polling(bot)
+        except TelegramRetryAfter as exc:
+            self.stderr.write(
+                f"Telegram cheklovi: {exc.retry_after} soniyadan keyin qayta urinib ko'ring"
+            )
