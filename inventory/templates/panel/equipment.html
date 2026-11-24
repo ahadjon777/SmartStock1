@@ -1,14 +1,29 @@
 {% extends "panel/base.html" %}
 {% block panel %}
 <form method="get" class="bar">
-<input name="q" value="{{ request.GET.q }}" placeholder="Kod yoki nomi">
-<select name="warehouse"><option value="">Barcha omborlar</option>{% for w in warehouses %}<option value="{{ w.id }}"{% if request.GET.warehouse == w.id|stringformat:"s" %} selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
-<select name="status"><option value="">Har qanday holat</option>{% for v, l in statuses %}<option value="{{ v }}"{% if request.GET.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-<button class="sm">Ko'rsatish</button>
+  <input name="q" value="{{ request.GET.q }}" placeholder="Kod yoki nomi">
+  <select name="warehouse"><option value="">Barcha omborlar</option>{% for w in warehouses %}<option value="{{ w.id }}"{% if request.GET.warehouse == w.id|stringformat:"s" %} selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
+  <select name="status"><option value="">Har qanday holat</option>{% for value,label in statuses %}<option value="{{ value }}"{% if request.GET.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <button class="sm">Ko'rsatish</button>
 </form>
-<div class="bar"><a class="btn sm" href="{% url 'panel_equipment_new' %}">+ Yangi texnika</a>{% if panel_admin %}<a class="btn sm" href="{% url 'panel_import' %}" style="background:#232a45">Excel yuklash</a><a class="btn sm" href="{% url 'labels' %}" style="background:#232a45">QR yorliqlar</a>{% endif %}</div>
-{% if panel_admin %}<form method="post" action="{% url 'panel_equipment_bulk' %}" onsubmit="const action=this.action.value;if(action==='delete')return confirm('Tanlangan texnikalarni va ularga tegishli harakat tarixini o‘chirishni tasdiqlaysizmi?');if(action==='move')return !!this.warehouse.value&&confirm('Ombordagi tanlangan texnikalarni tanlangan omborga o‘tkazasizmi?');return false;">{% csrf_token %}<div class="bar"><select name="action" required><option value="">Tanlanganlarga amal...</option><option value="move">Boshqa omborga biriktirish</option><option value="delete">O'chirish</option></select><select name="warehouse"><option value="">Maqsad omborni tanlang</option>{% for w in warehouses %}<option value="{{ w.pk }}">{{ w.name }}</option>{% endfor %}</select><button class="sm">Bajarish</button><label><input type="checkbox" onclick="document.querySelectorAll('.equipment-check').forEach(x=>x.checked=this.checked)"> Barchasini belgilash (sahifa)</label></div>{% endif %}
-<div class="card tw"><table><tr>{% if panel_admin %}<th>Tanlash</th>{% endif %}<th><a class="l" href="{{ sort_links.code }}">Kod ↕</a></th><th><a class="l" href="{{ sort_links.name }}">Nomi ↕</a></th><th><a class="l" href="{{ sort_links.warehouse }}">Ombor ↕</a></th><th><a class="l" href="{{ sort_links.status }}">Holati ↕</a></th><th></th></tr>{% for e in page %}<tr>{% if panel_admin %}<td><input class="equipment-check" type="checkbox" name="equipment_ids" value="{{ e.pk }}"></td>{% endif %}<td>{{ e.code }}</td><td>{{ e.name }}{% if e.manufactured_year %} ({{ e.manufactured_year }}){% endif %}</td><td>{{ e.warehouse }}</td><td><span class="tag {% if e.status == 'out' %}o{% else %}g{% endif %}">{{ e.get_status_display }}</span></td><td><a class="l" href="{% url 'panel_equipment_edit' e.pk %}">Tahrirlash</a></td></tr>{% empty %}<tr><td colspan="6" class="muted">Texnika topilmadi</td></tr>{% endfor %}</table></div>
+<div class="bar">
+  <a class="btn sm" href="{% url 'panel_equipment_new' %}">+ Yangi texnika</a>
+  {% if panel_admin %}<a class="btn sm" href="{% url 'panel_import' %}" style="background:#232a45">Excel yuklash</a><a class="btn sm" href="{% url 'labels' %}" style="background:#232a45">QR yorliqlar</a>{% endif %}
+</div>
+{% if panel_admin %}
+<form method="post" action="{% url 'panel_equipment_bulk' %}" onsubmit="const action=this.action.value;if(action==='delete')return confirm('Tanlangan texnikalar va ularning harakatlari o‘chirilsinmi?');return true">
+  {% csrf_token %}
+  <div class="bar"><select name="action" required><option value="">Amalni tanlang</option><option value="move">Boshqa omborga o'tkazish</option><option value="delete">O'chirish</option></select><select name="warehouse"><option value="">Ombor tanlang</option>{% for w in warehouses %}<option value="{{ w.pk }}">{{ w.name }}</option>{% endfor %}</select><button class="sm">Bajarish</button></div>
+{% endif %}
+<div class="card tw"><table>
+<tr>{% if panel_admin %}<th>Tanlash</th>{% endif %}<th><a class="l" href="{{ sort_links.code }}">Kod ↕</a></th><th><a class="l" href="{{ sort_links.name }}">Nomi ↕</a></th><th><a class="l" href="{{ sort_links.warehouse }}">Ombor ↕</a></th><th><a class="l" href="{{ sort_links.status }}">Holati ↕</a></th><th>Amallar</th></tr>
+{% for equipment in page %}<tr>
+  {% if panel_admin %}<td><input type="checkbox" name="equipment_ids" value="{{ equipment.pk }}"></td>{% endif %}
+  <td>{{ equipment.code }}</td><td>{{ equipment.name }}</td><td>{{ equipment.warehouse.name }}</td><td>{{ equipment.get_status_display }}</td>
+  <td><a class="l" href="{% url 'panel_equipment_edit' equipment.pk %}">Tahrirlash</a>
+  {% if panel_admin %}<form method="post" action="{% url 'panel_equipment_delete' equipment.pk %}" style="display:inline" onsubmit="return confirm('Ushbu texnika va unga tegishli harakatlar o‘chirilsinmi?')">{% csrf_token %}<button class="sm" type="submit">O'chirish</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6" class="muted">Texnika topilmadi</td></tr>{% endfor %}
+</table></div>
 {% if panel_admin %}</form>{% endif %}
-{% if page.paginator.num_pages > 1 %}<div class="bar" style="justify-content:center">{% if page.has_previous %}<a class="btn sm" href="?page={{ page.previous_page_number }}">← Oldingi</a>{% endif %}<span class="muted">{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="btn sm" href="?page={{ page.next_page_number }}">Keyingi →</a>{% endif %}</div>{% endif %}
+{% if page.paginator.num_pages > 1 %}<div class="bar" style="justify-content:center">{% if page.has_previous %}<a class="btn sm" href="?page={{ page.previous_page_number }}">← Oldingi</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="btn sm" href="?page={{ page.next_page_number }}">Keyingi →</a>{% endif %}</div>{% endif %}
 {% endblock %}
