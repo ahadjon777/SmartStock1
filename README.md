@@ -62,6 +62,8 @@ Veb-dastur ham bir xil `.env` bilan ishga tushirilsa, texnika chiqarilganda, bir
 ## QR yorliqlarni chop etish
 Admin sifatida kirib `/labels/` sahifasini oching: ombor yoki kod boshlanishi bo'yicha filtrlab, "Chop etish" bosiladi (bir sahifada 500 tagacha).
 
+> **Muhim:** yorliqlar oddiy (standart) QR formatida yaratiladi. Avvalgi versiyada qisqa raqamli kodlar «Micro QR» bo'lib chiqqan, uni telefon kamerasi va brauzer skaneri o'qiy olmaydi (ayrim qo'l skanerlari o'qiydi). Eski yorliqlarni `/labels/` sahifasidan qayta chop eting.
+
 ## Admin panel (`/panel/`)
 - **Bosh sahifa:** jami texnika, hozir tadbirda, bugungi chiqish/qaytish, omborlar kesimi, so'nggi harakatlar
 - **Tadbirda:** kim jami olgan, kimga biriktirilgan, hudud, qancha vaqtdan beri (qidiruv bilan)

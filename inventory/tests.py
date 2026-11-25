@@ -425,3 +425,98 @@ class BotDispatcherTests(TestCase):
         await self.dp.feed_raw_update(self.bot, _cb_update(8, "m:ld:on", user_id=999))
         self.assertEqual(self.sent(EditMessageText), [])
         self.assertFalse(await sync_to_async(bot_data.lockdown_state)())
+
+
+# ---------------------------------------------------------------------------
+# QR yorliqlar (Micro QR emas!) va bot xabarlaridagi qisqa nom + inventar raqami
+# ---------------------------------------------------------------------------
+from .fmt import item_label, short_name
+from .views import make_qr, qr_svg
+
+
+class QrLabelTests(TestCase):
+    def test_numeric_inventory_codes_are_standard_qr_not_micro(self):
+        # segno.make() bunday kodlarni Micro QR qiladi, telefon kamerasi esa uni o'qiy olmaydi
+        for code in ("0110104000001", "123456", "CAM-1", "A" * 40):
+            qr = make_qr(code)
+            self.assertFalse(qr.is_micro, code)
+            self.assertGreaterEqual(qr.symbol_size(border=0)[0], 21, code)
+
+    def test_quiet_zone_is_at_least_four_modules(self):
+        qr = make_qr("0110104000001")
+        modules = qr.symbol_size(border=0)[0]
+        # svg_inline(scale=4, border=4) -> (modul + 2*4 ta bo'sh modul) * 4 piksel
+        self.assertIn(f'width="{(modules + 8) * 4}"', qr_svg("0110104000001"))
+
+    def test_labels_page_lists_code_and_short_name(self):
+        admin = User.objects.create_superuser(username="adm", password="x")
+        wh = Warehouse.objects.create(name="W")
+        Equipment.objects.create(code="INV-001", name="Sony A7 III kamera obyektiv bilan to'liq komplekt va sumka", warehouse=wh)
+        self.client.force_login(admin)
+        html_ = self.client.get(reverse("labels")).content.decode()
+        self.assertIn("INV-001", html_)
+        self.assertIn("<svg", html_)
+        self.assertNotIn("sumka", html_)  # uzun nom yorliqda qisqartiriladi
+
+
+class ShortNameTests(TestCase):
+    def test_short_name(self):
+        self.assertEqual(short_name("Kamera"), "Kamera")
+        self.assertEqual(short_name("  Sony   A7  III  "), "Sony A7 III")
+        long = short_name("Sony A7 III kamera obyektiv bilan komplekt")
+        self.assertEqual(long, "Sony A7 III kamera obyektiv…")
+        self.assertLessEqual(len(long), 29)
+        self.assertEqual(short_name("A" * 50), "A" * 28 + "…")  # bo'sh joy yo'q bo'lsa ham qirqiladi
+        self.assertEqual(short_name(""), "")
+
+    def test_item_label_has_inventory_number(self):
+        e = Equipment(code="0110104000001", name="Mikrofon")
+        self.assertEqual(item_label(e), "Mikrofon · inv. № 0110104000001")
+
+
+class NotificationTextTests(TestCase):
+    def setUp(self):
+        self.boss = User.objects.create_user(username="boss", password="x", first_name="Boss Bossov")
+        self.ali = User.objects.create_user(username="ali", password="x", first_name="Ali Valiyev")
+        wh = Warehouse.objects.create(name="Main")
+        self.e = Equipment.objects.create(
+            code="0110104000001", name="Sony A7 III kamera obyektiv bilan komplekt", warehouse=wh,
+        )
+
+    @patch("inventory.views.notify")
+    def test_checkout_notification_lists_items(self, notify):
+        self.client.force_login(self.boss)
+        r = _post(self.client, "checkout_api", {"codes": ["0110104000001"], "region": "tashkent_city", "event": "Konsert"})
+        self.assertTrue(r.json()["ok"])
+        text = notify.call_args[0][0]
+        self.assertIn("Boss Bossov", text)
+        self.assertIn("Sony A7 III kamera obyektiv… · inv. № 0110104000001", text)
+        self.assertIn("Konsert", text)
+
+    @patch("inventory.views.notify")
+    def test_assignment_notification_has_person_short_name_and_inventory_number(self, notify):
+        self.client.force_login(self.boss)
+        _post(self.client, "checkout_api", {"codes": ["0110104000001"], "region": "tashkent_city", "event": "Konsert"})
+        notify.reset_mock()
+        self.client.force_login(self.ali)
+        self.assertTrue(_post(self.client, "take_api", {"code": "0110104000001"}).json()["ok"])
+        text = notify.call_args[0][0]
+        self.assertIn("Ali Valiyev", text)
+        self.assertIn("Sony A7 III kamera obyektiv… · inv. № 0110104000001", text)
+        self.assertNotIn("komplekt", text)  # to'liq uzun nom emas, qisqasi
+
+    def test_bot_screens_show_short_name_and_inventory_number(self):
+        Movement.objects.create(
+            equipment=self.e, issued_by=self.boss, taken_by="Boss Bossov", holder="Ali Valiyev",
+            region="tashkent_city", out_at=timezone.now(),
+        )
+        self.e.status = Equipment.Status.OUT
+        self.e.save()
+        text, _ = bot_data.out_screen(0)
+        self.assertIn("Sony A7 III kamera obyektiv…", text)
+        self.assertIn("inv. № <code>0110104000001</code>", text)
+        self.assertIn("Ali Valiyev", text)
+        self.assertNotIn("komplekt", text)
+        card, _ = bot_data.equipment_card(self.e.pk)
+        self.assertIn("Inventar №", card)
+        self.assertIn("komplekt", card)  # kartada to'liq nom

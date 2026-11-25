@@ -13,8 +13,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .access import display_name, is_admin, is_restricted, managed_warehouses
+from .fmt import item_label, short_name
 from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
+
+
+def make_qr(code):
+    """Faqat oddiy (standart) QR. segno.make() qisqa raqamli kodlarni avtomatik «Micro QR» qilib yaratadi:
+    telefon kamerasi va brauzer skaneri Micro QR'ni o'qiy olmaydi (faqat ayrim qo'l skanerlari o'qiydi)."""
+    return segno.make_qr(code, error="m")
+
+
+def qr_svg(code):
+    # border=4: standart bo'yicha QR atrofidagi bo'sh maydon (quiet zone) kamida 4 modul bo'lishi kerak
+    return make_qr(code).svg_inline(scale=4, border=4, dark="#000", light="#fff")
 
 PERIODS = {
     "week": ("Hafta", 7),
@@ -79,8 +91,7 @@ def labels(request):
         qs = qs.filter(code__startswith=request.GET["q"])
     limit = int(request.GET["limit"]) if request.GET.get("limit", "").isdigit() else 60
     items = [
-        {"code": e.code, "name": e.name,
-         "svg": segno.make(e.code, error="m").svg_inline(scale=4, border=1, dark="#000")}
+        {"code": e.code, "name": short_name(e.name, 40), "svg": qr_svg(e.code)}
         for e in qs[: min(limit, 500)]
     ]
     return render(request, "inventory/labels.html", {
@@ -144,7 +155,11 @@ def checkout_api(request):
 
     if done:
         place = Region(region).label + (f", {event}" if event else "")
-        notify(f"📤 {me} {len(done)} ta texnika oldi ({place})", [[("📦 Tadbirda nima bor", "n:out")]])
+        lines = [f"📤 {me} {len(done)} ta texnika oldi", f"📍 {place}"]
+        lines += [f"• {item_label(items[c])}" for c in done[:10]]
+        if len(done) > 10:
+            lines.append(f"… yana {len(done) - 10} ta")
+        notify("\n".join(lines), [[("📦 Tadbirda nima bor", "n:out")]])
     return JsonResponse({
         "ok": bool(done), "done": len(done), "skipped": skipped,
         "message": f"{len(done)} ta texnika chiqarildi",
@@ -203,9 +218,11 @@ def take_api(request):
                 "error": f"{item.name} shu zahoti o'zgartirildi, qaytadan skanerlang",
             }, status=409)
 
-    text = f"📌 {me} oldi: {item.code} {item.name}"
+    text = f"📌 Texnika biriktirildi\n👤 {me}\n🔧 {item_label(item)}"
+    if move.event:
+        text += f"\n🎪 {move.event}"
     if previous:
-        text += f"\n(avval: {previous})"
+        text += f"\n↪️ avval: {previous}"
     notify(text)
     return JsonResponse({
         "ok": True, "code": item.code, "mine": _mine(request.user),

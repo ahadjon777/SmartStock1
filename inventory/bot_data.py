@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from . import reports, security
 from .access import display_name
+from .fmt import short_name
 from .models import BlockedIP, Equipment, Movement, Region, SecurityEvent, SecurityState, Warehouse
 
 PER_PAGE = 4       # "Tadbirda" ro'yxatida bir sahifadagi chiqarishlar soni
@@ -149,7 +150,7 @@ def out_screen(page=0):
         lines.append(head)
         for m in rows_[:MAX_ITEMS]:
             who = esc(m.holder) if m.holder else "<i>biriktirilmagan</i>"
-            lines.append(f"   • <code>{esc(m.equipment.code)}</code> {esc(m.equipment.name)} → {who}")
+            lines.append(f"   • {esc(short_name(m.equipment.name))} · inv. № <code>{esc(m.equipment.code)}</code> → {who}")
         if len(rows_) > MAX_ITEMS:
             lines.append(f"   … yana {len(rows_) - MAX_ITEMS} ta")
         lines.append("")
@@ -216,7 +217,7 @@ def search_screen(query):
         return equipment_card(hits.first().pk)
     if total:
         rows = [
-            [(f"{STATUS_ICON.get(e.status, '⚪')} {e.code} · {e.name}"[:60], f"e:{e.pk}")]
+            [(f"{STATUS_ICON.get(e.status, '⚪')} {short_name(e.name, 24)} · {e.code}"[:60], f"e:{e.pk}")]
             for e in hits[:MAX_HITS]
         ]
         text = f"<b>🔎 «{esc(q)}»</b> — {total} ta texnika"
@@ -233,7 +234,7 @@ def search_screen(query):
         lines = [f"<b>🔎 «{esc(q)}»</b> — hozir tadbirdagi texnikalar", ""]
         for m in people:
             lines.append(
-                f"• <code>{esc(m.equipment.code)}</code> {esc(m.equipment.name)}\n"
+                f"• {esc(short_name(m.equipment.name))} · inv. № <code>{esc(m.equipment.code)}</code>\n"
                 f"   olgan: {esc(m.taken_by)} → {esc(m.holder) if m.holder else '<i>biriktirilmagan</i>'}"
             )
         return clip("\n".join(lines)), [[("🔎 Yangi qidiruv", "m:find"), ("🏠 Menyu", "m:home")]]
@@ -246,7 +247,7 @@ def equipment_card(pk):
     if e is None:
         return "Texnika topilmadi (o'chirilgan bo'lishi mumkin).", [[("🏠 Menyu", "m:home")]]
 
-    lines = [f"<b>{esc(e.name)}</b>", f"Kod: <code>{esc(e.code)}</code>", f"🏭 Ombor: {esc(e.warehouse.name)}"]
+    lines = [f"<b>{esc(e.name)}</b>", f"Inventar №: <code>{esc(e.code)}</code>", f"🏭 Ombor: {esc(e.warehouse.name)}"]
     if e.manufactured_year:
         lines.append(f"📅 Ishlab chiqarilgan: {e.manufactured_year}")
     lines.append(f"Holati: {STATUS_ICON.get(e.status, '⚪')} {e.get_status_display()}")
