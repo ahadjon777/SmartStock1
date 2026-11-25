@@ -13,8 +13,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .access import display_name, is_admin, is_restricted, managed_warehouses
+from .fmt import item_label, short_name
 from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
+
+
+def make_qr(code):
+    """Faqat oddiy (standart) QR. segno.make() qisqa raqamli kodlarni avtomatik «Micro QR» qilib yaratadi:
+    telefon kamerasi va brauzer skaneri Micro QR'ni o'qiy olmaydi (faqat ayrim qo'l skanerlari o'qiydi)."""
+    return segno.make_qr(code, error="m")
+
+
+def qr_svg(code):
+    # border=4: standart bo'yicha QR atrofidagi bo'sh maydon (quiet zone) kamida 4 modul bo'lishi kerak
+    return make_qr(code).svg_inline(scale=4, border=4, dark="#000", light="#fff")
 
 PERIODS = {
     "week": ("Hafta", 7),
@@ -47,13 +59,31 @@ def _bad(text, status=400):
 
 
 def _mine(user):
-    moves = Movement.objects.filter(in_at__isnull=True, holder_user=user).select_related("equipment")
-    return [{"code": m.equipment.code, "name": m.equipment.name} for m in moves]
+    moves = (
+        Movement.objects.filter(in_at__isnull=True, holder_user=user)
+        .select_related("equipment").order_by("equipment__code")
+    )
+    return [
+        {
+            "code": m.equipment.code, "name": m.equipment.name, "event": m.event,
+            "region": Region(m.region).label if m.region in Region.values else "",
+        }
+        for m in moves
+    ]
+
+
+def _find_equipment(code):
+    """QR kod bo'yicha texnikani topadi (avval aniq, keyin katta-kichik harfga e'tiborsiz). Faqat tranzaksiya ichida."""
+    qs = Equipment.objects.select_for_update()
+    try:
+        return qs.get(code=code)
+    except Equipment.DoesNotExist:
+        return qs.filter(code__iexact=code).first()
 
 
 def _equipment_lines(items, limit=35):
     """Telegram uchun avval texnika nomi, so'ng inventar/QR kodini ko'rsatadi."""
-    lines = [f"• {item.name} — {item.code}" for item in items[:limit]]
+    lines = [f"• {item_label(item)}" for item in items[:limit]]
     if len(items) > limit:
         lines.append(f"… va yana {len(items) - limit} ta")
     return lines
@@ -69,8 +99,7 @@ def labels(request):
         qs = qs.filter(code__startswith=request.GET["q"])
     limit = int(request.GET["limit"]) if request.GET.get("limit", "").isdigit() else 60
     items = [
-        {"code": e.code, "name": e.name,
-         "svg": segno.make(e.code, error="m").svg_inline(scale=4, border=1, dark="#000")}
+        {"code": e.code, "name": short_name(e.name, 40), "svg": qr_svg(e.code)}
         for e in qs[: min(limit, 500)]
     ]
     return render(request, "inventory/labels.html", {
@@ -81,7 +110,10 @@ def labels(request):
 @login_required
 def scan(request):
     """Bosh menyu."""
-    return render(request, "inventory/scan.html", {"me": display_name(request.user)})
+    return render(request, "inventory/scan.html", {
+        "me": display_name(request.user),
+        "mine_count": Movement.objects.filter(in_at__isnull=True, holder_user=request.user).count(),
+    })
 
 
 @login_required
@@ -134,7 +166,7 @@ def checkout_api(request):
         place = Region(region).label + (f", {event}" if event else "")
         text = f"📤 OMBORDAN CHIQARILDI\n👤 Mas'ul: {me}\n📍 Manzil: {place}\n📦 Soni: {len(done)}\n\n"
         text += "\n".join(_equipment_lines(completed_items))
-        notify(text)
+        notify(text, [[("📦 Tadbirda nima bor", "n:out")]])
     return JsonResponse({
         "ok": bool(done), "done": len(done), "skipped": skipped,
         "message": f"{len(done)} ta texnika chiqarildi",
@@ -151,39 +183,77 @@ def take(request):
 @login_required
 @require_POST
 def take_api(request):
+    """Bitta texnikani skanerlagan xodimga biriktiradi. Takroriy so'rov xavfsiz (idempotent)."""
     data = _body(request)
     if data is None:
         return _bad("Noto'g'ri so'rov")
     code = str(data.get("code") or "").strip()
+    if not code:
+        return _bad("QR kod bo'sh")
     force = bool(data.get("force"))
     me = display_name(request.user)
+    previous = ""
 
     with transaction.atomic():
-        try:
-            item = Equipment.objects.select_for_update().get(code=code)
-        except Equipment.DoesNotExist:
-            return _bad("Bunday QR kodli texnika topilmadi", 404)
+        item = _find_equipment(code)
+        if item is None:
+            return JsonResponse({"ok": False, "code": code, "error": f"«{code}» kodli texnika topilmadi"}, status=404)
         move = item.movements.filter(in_at__isnull=True).first()
         if move is None:
-            return _bad(f"{item.name} tadbirda emas (avval ombordan chiqarilishi kerak)")
+            return JsonResponse({
+                "ok": False, "code": item.code,
+                "error": f"{item.name} tadbirda emas (avval ombordan chiqarilishi kerak)",
+            }, status=400)
         if move.holder_user_id == request.user.id:
             return JsonResponse({
-                "ok": True, "already": True, "mine": _mine(request.user),
+                "ok": True, "already": True, "code": item.code, "mine": _mine(request.user),
                 "message": f"{item.name} allaqachon sizga biriktirilgan",
             })
         if move.holder and not force:
             return JsonResponse({
-                "ok": False, "confirm": True, "holder": move.holder,
+                "ok": False, "confirm": True, "code": item.code, "name": item.name, "holder": move.holder,
                 "error": f"{item.name} hozir {move.holder} ga biriktirilgan",
             })
-        move.holder = me
-        move.holder_user = request.user
-        move.save(update_fields=["holder", "holder_user"])
+        previous = move.holder
+        # Boshqa xodim shu zahoti biriktirib qo'ygan bo'lsa, uning ustidan jim yozib yubormaymiz
+        changed = Movement.objects.filter(
+            pk=move.pk, in_at__isnull=True, holder=move.holder, holder_user_id=move.holder_user_id,
+        ).update(holder=me, holder_user=request.user)
+        if not changed:
+            return JsonResponse({
+                "ok": False, "code": item.code,
+                "error": f"{item.name} shu zahoti o'zgartirildi, qaytadan skanerlang",
+            }, status=409)
 
-    notify(f"📌 TEXNIKA BIRIKTIRILDI\n👤 Xodim: {me}\n🏷 {item.name} — {item.code}")
+    text = f"📌 Texnika biriktirildi\n👤 {me}\n🔧 {item_label(item)}"
+    if move.event:
+        text += f"\n🎪 {move.event}"
+    if previous:
+        text += f"\n↪️ avval: {previous}"
+    notify(text)
     return JsonResponse({
-        "ok": True, "mine": _mine(request.user),
+        "ok": True, "code": item.code, "mine": _mine(request.user),
         "message": f"{item.name} sizga biriktirildi",
+    })
+
+
+@login_required
+@require_POST
+def release_api(request):
+    """Xodim o'ziga adashib biriktirilgan texnikani bo'shatadi (tadbirda qoladi, biriktirilmagan bo'ladi)."""
+    data = _body(request)
+    if data is None:
+        return _bad("Noto'g'ri so'rov")
+    codes = _codes(data)
+    if not codes:
+        return _bad("Texnika tanlanmadi")
+    released = Movement.objects.filter(
+        in_at__isnull=True, holder_user=request.user, equipment__code__in=codes,
+    ).update(holder="", holder_user=None)
+    return JsonResponse({
+        "ok": released > 0, "released": released, "mine": _mine(request.user),
+        "message": f"{released} ta texnika bo'shatildi",
+        "error": "" if released else "Bu texnika sizga biriktirilmagan",
     })
 
 
@@ -240,7 +310,7 @@ def checkin_api(request):
         text += "\n".join(_equipment_lines(completed_items))
         if missing:
             text += f"\n\n⚠️ Shu mas'ul bo'yicha hali qaytmagan: {len(missing)} ta"
-        notify(text)
+        notify(text, [[("📦 Tadbirda nima bor", "n:out")]])
     return JsonResponse({
         "ok": bool(done), "done": len(done), "skipped": skipped, "missing": missing,
         "message": f"{len(done)} ta texnika qaytarildi",

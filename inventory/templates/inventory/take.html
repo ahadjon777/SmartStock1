@@ -2,45 +2,105 @@
 {% block title %}Biriktirish{% endblock %}
 {% block content %}
 <div class="card">
-<b>{{ me }}</b>
-<p style="color:var(--m)">O'zingizga beriladigan texnikalarning QR kodini skanerlang. F.I.Sh. avtomatik yoziladi.</p>
+<div class="row" style="border:0;padding:0"><b>{{ me }}</b><span class="pill">Menda: <b id="count">0</b> ta</span></div>
+<p class="muted">O'zingizga beriladigan texnikalarning QR kodini skanerlang. Har bir kod darhol sizga biriktiriladi, F.I.Sh. avtomatik yoziladi.</p>
 <div id="reader" style="width:100%"></div>
 <button id="start" type="button">Kamerani yoqish</button>
-<input id="manual" placeholder="Kamera ishlamasa kodni yozing" style="margin-top:10px">
-<button id="add" type="button" style="background:#232a45">Biriktirish</button>
-<div id="out"></div>
+<form id="manualForm" style="display:flex;gap:8px;margin-top:10px">
+<input id="manual" placeholder="Kamera ishlamasa kodni yozing" autocomplete="off" autocapitalize="characters" style="margin:0">
+<button type="submit" class="alt" style="width:auto;padding:0 20px">OK</button>
+</form>
 </div>
 
+<div id="feed"></div>
+
 <div class="card">
-<b>Menda: <span id="count">0</span> ta</b>
-<div id="list" style="color:var(--m)"></div>
+<b>Menda bor texnikalar</b>
+<div id="list"></div>
 </div>
 {% csrf_token %}
 {{ mine|json_script:"mine" }}
 {% include "inventory/_scanner.html" %}
 <script>
-const out = document.getElementById('out'), list = document.getElementById('list');
-let busy = false;
-function draw(items) {
-  list.innerHTML = '';
-  items.forEach(it => { const row = document.createElement('div'); row.className = 'row'; row.textContent = it.code + ' — ' + it.name; list.append(row); });
-  document.getElementById('count').textContent = items.length;
-}
-draw(JSON.parse(document.getElementById('mine').textContent));
+const TAKE = "{% url 'take_api' %}", RELEASE = "{% url 'release_api' %}", LOGIN = "{% url 'login' %}";
+const feed = document.getElementById('feed'), list = document.getElementById('list'), countEl = document.getElementById('count');
+let mine = JSON.parse(document.getElementById('mine').textContent);
 
-async function take(code, force) {
-  if (busy) return;
-  busy = true;
-  try {
-    let d = await postJSON("{% url 'take_api' %}", {code, force: !!force});
-    if (d.confirm && confirm(d.error + '. O\'zingizga ko\'chirasizmi?')) {
-      d = await postJSON("{% url 'take_api' %}", {code, force: true});
-    }
-    showMsg(out, d.ok, d.ok ? d.message : d.error);
-    if (d.mine) draw(d.mine);
-  } finally { busy = false; }
+function drawMine() {
+  list.innerHTML = '';
+  if (!mine.length) {
+    const e = document.createElement('div'); e.className = 'muted'; e.style.padding = '10px 0';
+    e.textContent = 'Hali hech narsa biriktirilmagan.'; list.append(e);
+  }
+  mine.forEach(it => {
+    const row = document.createElement('div'); row.className = 'row';
+    const info = document.createElement('div');
+    const t = document.createElement('div'); t.textContent = it.code + ' — ' + it.name; info.append(t);
+    const sub = [it.region, it.event].filter(Boolean).join(' · ');
+    if (sub) { const s = document.createElement('small'); s.className = 'muted'; s.textContent = sub; info.append(s); }
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = "Bo'shatish";
+    b.onclick = () => release(it);
+    row.append(info, b); list.append(row);
+  });
+  countEl.textContent = mine.length;
 }
-initScanner(c => take(c));
-document.getElementById('add').onclick = () => { const v = document.getElementById('manual').value.trim(); if (v) { take(v); document.getElementById('manual').value = ''; } };
+
+function toast(kind, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + kind; d.style.margin = '0 0 8px'; d.textContent = text;
+  feed.prepend(d);
+  while (feed.children.length > 4) feed.lastChild.remove();
+  return d;
+}
+
+function askMove(code, name, holder) {
+  const d = toast('warn', name + " hozir " + holder + " ga biriktirilgan. O'zingizga ko'chiraymi?");
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;margin-top:10px';
+  const yes = document.createElement('button'); yes.type = 'button'; yes.textContent = "Ha, ko'chirish";
+  const no = document.createElement('button'); no.type = 'button'; no.className = 'alt'; no.textContent = "Yo'q";
+  yes.onclick = () => { d.remove(); enqueue(code, true); };
+  no.onclick = () => d.remove();
+  row.append(yes, no); d.append(row);
+}
+
+/* Skanerlar navbatga tushadi va ketma-ket yuboriladi: hech biri yo'qolmaydi, ketma-ket skanerlash sekinlashmaydi. */
+const queue = []; let pumping = false;
+function enqueue(code, force) {
+  code = (code || '').trim();
+  if (!code || queue.some(q => q.code === code && q.force === !!force)) return;
+  queue.push({code, force: !!force});
+  pump();
+}
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  while (queue.length) {
+    const job = queue.shift();
+    const d = await api(TAKE, {code: job.code, force: job.force}, {retries: 2});
+    if (d.mine) { mine = d.mine; drawMine(); }
+    if (d.confirm) { feedback('err'); askMove(d.code || job.code, d.name || job.code, d.holder); }
+    else if (d.ok) { feedback('ok'); toast(d.already ? 'warn' : 'ok', d.message); }
+    else {
+      feedback('err'); toast('err', d.error || 'Xatolik yuz berdi');
+      if (d.login) setTimeout(() => { location.href = LOGIN + '?next=' + encodeURIComponent(location.pathname); }, 1500);
+    }
+  }
+  pumping = false;
+}
+
+async function release(it) {
+  if (!confirm(it.code + " — " + it.name + " ni o'zingizdan bo'shatasizmi?")) return;
+  const d = await api(RELEASE, {codes: [it.code]});
+  if (d.mine) { mine = d.mine; drawMine(); }
+  toast(d.ok ? 'ok' : 'err', d.ok ? it.name + " bo'shatildi" : (d.error || 'Xatolik'));
+}
+
+initScanner(c => enqueue(c));
+document.getElementById('manualForm').onsubmit = ev => {
+  ev.preventDefault();
+  const inp = document.getElementById('manual');
+  enqueue(inp.value); inp.value = ''; inp.focus();
+};
+drawMine();
 </script>
 {% endblock %}

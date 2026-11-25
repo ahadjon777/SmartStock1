@@ -24,24 +24,29 @@
 const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
 const manual = document.getElementById('manual');
 const redraw = () => renderCart(list, count, codes, redraw);
-function add(c) { c = (c || '').trim(); if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
+function add(c) { c = (c || '').trim(); if (c && !codes.includes(c)) { codes.push(c); redraw(); feedback('ok'); } }
 initScanner(add);
 document.getElementById('add').onclick = () => { add(manual.value); manual.value = ''; manual.focus(); };
 manual.focus();
-document.getElementById('send').onclick = async () => {
-  const d = await postJSON("{% url 'checkin_api' %}", {codes});
-  let text = d.ok ? d.message : d.error;
-  const bad = (d.skipped || []).map(s => s.code);
-  if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
-  showMsg(out, d.ok, text);
-  const box = document.getElementById('missing'); box.innerHTML = '';
-  if (d.missing && d.missing.length) {
-    const h = document.createElement('div'); h.className = 'msg err'; h.style.marginTop = '10px';
-    h.textContent = 'Hali qaytmagan: ' + d.missing.length + ' ta';
-    box.append(h);
-    d.missing.forEach(m => { const row = document.createElement('div'); row.className = 'row'; row.textContent = m.name + ' — ' + m.code + ' → ' + m.holder; box.append(row); });
-  }
-  if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+document.getElementById('send').onclick = async ev => {
+  const btn = ev.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const d = await postJSON("{% url 'checkin_api' %}", {codes});
+    let text = d.ok ? d.message : d.error;
+    const bad = (d.skipped || []).map(s => s.code);
+    if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
+    showMsg(out, d.ok, text);
+    const box = document.getElementById('missing'); box.innerHTML = '';
+    if (d.missing && d.missing.length) {
+      const h = document.createElement('div'); h.className = 'msg err'; h.style.marginTop = '10px';
+      h.textContent = 'Hali qaytmagan: ' + d.missing.length + ' ta';
+      box.append(h);
+      d.missing.forEach(m => { const row = document.createElement('div'); row.className = 'row'; row.textContent = m.name + ' — ' + m.code + ' → ' + m.holder; box.append(row); });
+    }
+    if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+  } finally { btn.disabled = false; }
 };
 </script>
 {% endblock %}

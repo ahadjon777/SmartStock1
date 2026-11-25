@@ -22,14 +22,18 @@ def _send(text, buttons):
                 data=json.dumps(payload).encode(),
                 headers={"Content-Type": "application/json"},
             )
-            urllib.request.urlopen(req, timeout=5)
+            urllib.request.urlopen(req, timeout=8)
         except Exception as exc:  # xabar yuborilmasa ham asosiy ish to'xtamasin
             log.warning("Telegram xabari yuborilmadi: %s", exc)
 
 
-def notify(text, buttons=None, background=False):
-    """Adminlarga Telegram xabari. buttons: qatorlar ro'yxati, har biri [(matn, callback_data), ...]."""
-    if not settings.TELEGRAM_BOT_TOKEN:
+def notify(text, buttons=None, background=True):
+    """Adminlarga Telegram xabari. buttons: qatorlar ro'yxati, har biri [(matn, callback_data), ...].
+
+    Standart bo'yicha alohida oqimda yuboriladi: Telegram sekin yoki yopiq bo'lsa ham
+    skanerlash va biriktirish so'rovlari kutib qolmaydi.
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_IDS:
         return
     if background:
         threading.Thread(target=_send, args=(text, buttons), daemon=True).start()
