@@ -3,9 +3,13 @@
 {% block content %}
 <div class="card">
 <h2>Kirish</h2>
+{% if request.GET.timeout %}
+<div class="msg err">10 daqiqa faolsizlik sababli tizimdan chiqdingiz. Qayta kiring.</div>
+{% endif %}
 <form method="post">{% csrf_token %}
 <input name="username" placeholder="Login" autocomplete="username" required>
 <input name="password" type="password" placeholder="Parol" autocomplete="current-password" required>
+{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 {% if form.errors %}<div class="msg err">Login yoki parol noto'g'ri</div>{% endif %}
 <button type="submit">Kirish</button>
 </form>
