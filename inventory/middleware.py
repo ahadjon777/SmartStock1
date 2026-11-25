@@ -1,8 +1,33 @@
 from django.conf import settings
+from django.contrib.auth import logout
 from django.core.cache import cache
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, HttpResponseRedirect
+from django.urls import reverse
+from django.utils import timezone
 
 from . import security
+
+
+class IdleTimeoutMiddleware:
+    """10 daqiqalik faolsizlikdan keyin sessiyani tugatadi."""
+
+    timeout_seconds = 10 * 60
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            now = timezone.now().timestamp()
+            last_activity = request.session.get("last_activity")
+
+            if last_activity and now - float(last_activity) > self.timeout_seconds:
+                logout(request)
+                return HttpResponseRedirect(f'{reverse(settings.LOGIN_URL)}?timeout=1')
+
+            request.session["last_activity"] = now
+
+        return self.get_response(request)
 
 
 class ThreatMiddleware:
