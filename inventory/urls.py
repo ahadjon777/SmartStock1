@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/checkout/", views.checkout_api, name="checkout_api"),
     path("take/", views.take, name="take"),
     path("api/take/", views.take_api, name="take_api"),
+    path("api/release/", views.release_api, name="release_api"),
     path("in/", views.checkin, name="checkin"),
     path("api/checkin/", views.checkin_api, name="checkin_api"),
     path("progress/", views.progress, name="progress"),

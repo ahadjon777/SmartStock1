@@ -1,9 +1,9 @@
 {% extends "inventory/base.html" %}
 {% block title %}SmartStock{% endblock %}
 {% block content %}
-<div class="card"><b>{{ me }}</b><br><span style="color:var(--m)">Nima qilmoqchisiz?</span></div>
+<div class="card"><b>{{ me }}</b><br><span class="muted">Nima qilmoqchisiz?</span></div>
 <a class="btn" href="{% url 'checkout' %}" style="margin-bottom:12px">📤 Ombordan chiqarish</a>
-<a class="btn" href="{% url 'take' %}" style="margin-bottom:12px">📌 Texnikani o'zimga biriktirish</a>
+<a class="btn" href="{% url 'take' %}" style="margin-bottom:12px">📌 Texnikani o'zimga biriktirish{% if mine_count %} · {{ mine_count }} ta{% endif %}</a>
 <a class="btn" href="{% url 'checkin' %}" style="margin-bottom:12px">📥 Omborga qaytarish</a>
 <a class="btn" href="{% url 'progress' %}" style="background:#232a45">📋 Jarayon (kimga biriktirilgan)</a>
 {% endblock %}

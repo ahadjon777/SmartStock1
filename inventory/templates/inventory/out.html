@@ -25,18 +25,23 @@
 <script>
 const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
 const redraw = () => renderCart(list, count, codes, redraw);
-function add(c) { if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
+function add(c) { if (c && !codes.includes(c)) { codes.push(c); redraw(); feedback('ok'); } }
 initScanner(add);
 document.getElementById('add').onclick = () => { add(document.getElementById('manual').value.trim()); document.getElementById('manual').value = ''; };
-document.getElementById('send').onclick = async () => {
-  const d = await postJSON("{% url 'checkout_api' %}", {
-    codes, region: document.getElementById('region').value, event: document.getElementById('event').value
-  });
-  let text = d.ok ? d.message : d.error;
-  const bad = (d.skipped || []).map(s => s.code);
-  if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
-  showMsg(out, d.ok, text);
-  if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+document.getElementById('send').onclick = async ev => {
+  const btn = ev.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const d = await postJSON("{% url 'checkout_api' %}", {
+      codes, region: document.getElementById('region').value, event: document.getElementById('event').value
+    });
+    let text = d.ok ? d.message : d.error;
+    const bad = (d.skipped || []).map(s => s.code);
+    if (bad.length) text += '. O\'tkazilmadi: ' + d.skipped.map(s => s.code + ' (' + s.reason + ')').join(', ');
+    showMsg(out, d.ok, text);
+    if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
+  } finally { btn.disabled = false; }
 };
 </script>
 {% endblock %}

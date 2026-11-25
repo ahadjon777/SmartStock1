@@ -1,27 +1,97 @@
-<script src="https://unpkg.com/html5-qrcode"></script>
+{% load static %}
+<script src="{% static 'inventory/html5-qrcode.min.js' %}"></script>
 <script>
-/* Kamera to'xtamaydi: ketma-ket skanerlanadi. Bir xil kod 2.5 soniya ichida takrorlansa e'tiborga olinmaydi. */
-function initScanner(onCode) {
+/* Kamera to'xtamaydi: ketma-ket skanerlanadi. Bir xil QR kamera ko'rinishida tursa, bir marta hisoblanadi
+   (u ko'rinishdan chiqib, dedupeMs o'tgandan keyingina qayta o'qiladi). */
+let _audio = null;
+function feedback(kind) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(kind === 'ok' ? 60 : [80, 60, 80]);
+    if (!_audio) return;
+    const o = _audio.createOscillator(), g = _audio.createGain();
+    o.type = 'sine'; o.frequency.value = kind === 'ok' ? 880 : 220; g.gain.value = 0.08;
+    o.connect(g); g.connect(_audio.destination);
+    o.start(); o.stop(_audio.currentTime + (kind === 'ok' ? 0.08 : 0.25));
+  } catch (e) {}
+}
+function cameraError(e) {
+  const n = String((e && (e.name || e.message)) || e);
+  if (/NotAllowed|Permission/i.test(n)) return "Kameraga ruxsat berilmagan. Brauzer sozlamalaridan ruxsat bering yoki kodni qo'lda kiriting.";
+  if (/NotFound|Devices/i.test(n)) return "Kamera topilmadi. Kodni qo'lda kiriting.";
+  if (/NotReadable|TrackStart/i.test(n)) return "Kamera band (boshqa dastur ishlatayotgan bo'lishi mumkin).";
+  return "Kamerani ishga tushirib bo'lmadi: " + n;
+}
+function initScanner(onCode, opts) {
+  const dedupeMs = (opts && opts.dedupeMs) || 4000;
   const btn = document.getElementById('start');
-  let last = '', lastAt = 0;
-  btn.onclick = () => {
-    const sc = new Html5Qrcode('reader');
-    sc.start({facingMode: 'environment'}, {fps: 10, qrbox: 220}, text => {
-      const now = Date.now();
-      const same = text === last && now - lastAt < 2500;
-      last = text; lastAt = now;
-      if (same) return;
-      if (navigator.vibrate) navigator.vibrate(60);
-      onCode(text.trim());
-    }).then(() => { btn.style.display = 'none'; })
-      .catch(() => alert('Kameraga ruxsat berilmadi. Kodni qo\'lda kiritishingiz mumkin.'));
-  };
+  let scanner = null, running = false, last = '', lastAt = 0;
+
+  function warn(text) {
+    let el = document.getElementById('camwarn');
+    if (!text) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'camwarn'; el.className = 'msg err'; btn.insertAdjacentElement('afterend', el); }
+    el.textContent = text;
+  }
+  function onScan(text) {
+    text = (text || '').trim();
+    if (!text) return;
+    const now = Date.now(), same = text === last && now - lastAt < dedupeMs;
+    last = text; lastAt = now;
+    if (!same) onCode(text);
+  }
+  async function start() {
+    if (!window.isSecureContext) { warn("Kamera faqat HTTPS (yoki localhost) manzilda ishlaydi. Saytni HTTPS orqali oching yoki kodni qo'lda kiriting."); return; }
+    if (!window.Html5Qrcode || !navigator.mediaDevices) { warn("Skaner yuklanmadi yoki brauzer kamerani qo'llamaydi. Sahifani yangilang yoki kodni qo'lda kiriting."); return; }
+    try { _audio = _audio || new (window.AudioContext || window.webkitAudioContext)(); _audio.resume(); } catch (e) {}
+    btn.disabled = true;
+    try {
+      scanner = scanner || new Html5Qrcode('reader', {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        experimentalFeatures: {useBarCodeDetectorIfSupported: true},
+        verbose: false,
+      });
+      await scanner.start(
+        {facingMode: 'environment'},
+        {fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return {width: s, height: s}; }},
+        onScan, () => {}
+      );
+      running = true; btn.textContent = "Kamerani o'chirish"; warn('');
+    } catch (e) { warn(cameraError(e)); }
+    btn.disabled = false;
+  }
+  async function stop() {
+    btn.disabled = true;
+    try { await scanner.stop(); } catch (e) {}
+    running = false; btn.textContent = 'Kamerani yoqish'; btn.disabled = false;
+  }
+  btn.onclick = () => (running ? stop() : start());
 }
-function postJSON(url, body) {
-  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify(body)})
-    .then(r => r.json());
+
+/* Server bilan aloqa: tarmoq xatosi, eskirgan sessiya, CSRF/403, 500 — hammasi tushunarli xabar bo'lib qaytadi. */
+async function api(url, body, opts) {
+  const retries = (opts && opts.retries) || 0;
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRFToken': csrf ? csrf.value : ''},
+        body: JSON.stringify(body),
+      });
+      if (r.redirected || r.status === 401) return {ok: false, login: true, error: "Sessiya tugagan. Qaytadan kiring."};
+      if (!(r.headers.get('content-type') || '').includes('json')) {
+        if (r.status === 403) return {ok: false, error: "Ruxsat yo'q yoki sahifa eskirgan (403). Sahifani yangilang."};
+        if (r.status === 503) return {ok: false, error: "Tizim vaqtincha yopilgan."};
+        return {ok: false, error: "Server xatosi (" + r.status + "). Birozdan keyin urinib ko'ring."};
+      }
+      return await r.json();
+    } catch (e) {
+      if (attempt >= retries) return {ok: false, network: true, error: "Internet aloqasi yo'q. Qayta urinib ko'ring."};
+      await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+    }
+  }
 }
+const postJSON = (url, body) => api(url, body);
 function showMsg(el, ok, text) {
   el.innerHTML = '<div class="msg ' + (ok ? 'ok' : 'err') + '"></div>';
   el.firstChild.textContent = text;

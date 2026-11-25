@@ -27,25 +27,37 @@ python manage.py import_excel texnikalar.xlsx
 ```
 
 ## Eslatma
-Kamera brauzerda faqat HTTPS (yoki localhost) orqali ishlaydi.
+Kamera brauzerda faqat HTTPS (yoki localhost) orqali ishlaydi. Skaner kutubxonasi (`html5-qrcode`) loyihaning o'ziga qo'shilgan, tashqi saytdan yuklanmaydi.
+
+## Internetga chiqarishda (DEBUG=0)
+`.env` da kamida shular bo'lsin: `DEBUG=0`, uzun tasodifiy `SECRET_KEY` (bo'lmasa dastur ishga tushmaydi), `ALLOWED_HOSTS=sizning-domen.uz`, `CSRF_TRUSTED_ORIGINS=https://sizning-domen.uz`.
+HTTPS (cloudflared, ngrok, nginx) orqasida: `HTTPS=1` va `TRUST_X_FORWARDED_FOR=1`. Bu cookie'larni faqat HTTPS uchun yopadi.
 
 ## Ish oqimi
 Har bir xodim o'z login'i bilan o'z telefonidan kiradi (login va F.I.Sh. `/panel/staff/` da admin tomonidan yaratiladi). F.I.Sh. har doim profildan avtomatik olinadi.
 1. **Chiqarish** (`/out/`): javobgar ombordagi hamma texnikani ketma-ket skanerlaydi, hudud va tadbirni tanlab, bitta "Chiqarish" bosadi.
-2. **Biriktirish** (`/take/`): tadbir joyida har bir xodim o'z telefonida o'ziga tegishli 2-4 ta texnikani skanerlaydi. Texnika boshqa xodimga biriktirilgan bo'lsa, ko'chirishni so'raydi.
+2. **Biriktirish** (`/take/`): tadbir joyida har bir xodim o'z telefonida o'ziga tegishli texnikalarni ketma-ket skanerlaydi (kamerani o'chirmasdan). Har bir kod darhol biriktiriladi, ovoz va tebranish bilan tasdiqlanadi. Texnika boshqa xodimga biriktirilgan bo'lsa, sahifaning o'zida «ko'chiraymi?» deb so'raydi. Adashib biriktirilganini «Bo'shatish» tugmasi bilan qaytarish mumkin. Internet uzilsa yoki sessiya tugasa, tushunarli xabar chiqadi.
 3. **Jarayon** (`/progress/`): javobgar "20 tadan 14 tasi biriktirildi, 6 tasi qoldi" ni ko'radi (har 15 soniyada yangilanadi).
 4. **Qaytarish** (`/in/`): hamma texnika skanerlanib, bitta "Qaytarish" bosiladi; qaytmagan texnikalar kimda ekani bilan ko'rsatiladi.
 
 ## Telegram admin bot
 1. @BotFather orqali bot yarating, tokenni oling. O'z ID'ingizni bilish uchun botga `/start` yozing.
-2. Windows'da (PowerShell):
+2. `.env` fayliga `TELEGRAM_BOT_TOKEN` va `TELEGRAM_ADMIN_IDS` ni yozing (`.env.example` ga qarang), so'ng:
 ```
-$env:TELEGRAM_BOT_TOKEN="123:ABC"
-$env:TELEGRAM_ADMIN_IDS="111111111,222222222"
 python manage.py run_bot
 ```
-Buyruqlar: `/kim` (kim jami olgan va kimga biriktirilgan), `/stat [hafta|oy|chorak|yarim|yil]`.
-Veb-dastur ham bir xil o'zgaruvchilar bilan ishga tushirilsa, texnika chiqarilganda va biriktirilganda adminlarga avtomatik xabar boradi.
+Bot tugmali menyu bilan ishlaydi: `/start` yoki `/menu` bosing, qolganini tugmalar bajaradi (xabar o'z joyida yangilanadi, chat to'lib ketmaydi). Telegramning pastki chap burchagidagi **Menu** tugmasi ham buyruqlar ro'yxatini ochadi.
+
+| Bo'lim | Nima qiladi |
+|---|---|
+| 📦 Tadbirda | Kim nima olgan, kimga biriktirilgan, qancha vaqtdan beri (sahifalab) |
+| 📊 Statistika | Hudud bo'yicha o'rtacha ishlash vaqti: hafta/oy/chorak/yarim yil/yil tugmalari |
+| 🔎 Qidirish | Texnika kodi, nomi yoki odam ismini yozing: karta, holati va so'nggi harakatlari chiqadi |
+| 🏭 Omborlar | Har bir ombor bo'yicha tadbirda/jami |
+| 🛡 Xavfsizlik | Hodisalar, lockdown (tasdiq bilan), bloklangan IP'larni ochish |
+
+Oddiy xabar yozsangiz, bot uni qidiruv deb qabul qiladi. Eski buyruqlar ham ishlaydi: `/kim`, `/stat [hafta|oy|chorak|yarim|yil]`, `/find`, `/xavf`, `/bloklar`, `/lockdown on|off`.
+Veb-dastur ham bir xil `.env` bilan ishga tushirilsa, texnika chiqarilganda, biriktirilganda va qaytarilganda adminlarga avtomatik xabar boradi (xabar sayt so'rovini sekinlashtirmaydi). `SITE_URL` berilsa, menyuda «🌐 Saytni ochish» tugmasi chiqadi.
 
 ## QR yorliqlarni chop etish
 Admin sifatida kirib `/labels/` sahifasini oching: ombor yoki kod boshlanishi bo'yicha filtrlab, "Chop etish" bosiladi (bir sahifada 500 tagacha).
