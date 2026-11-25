@@ -1,6 +1,6 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-/* Kamera to'xtamaydi: ketma-ket skanerlanadi. Bir xil kod 2.5 soniya ichida takrorlansa e'tiborga olinmaydi. */
+/* Kamera to'xtamaydi; bir xil kod 2.5 soniyada takrorlansa e'tiborga olinmaydi. */
 function initScanner(onCode) {
   const btn = document.getElementById('start');
   let last = '', lastAt = 0;
@@ -14,7 +14,7 @@ function initScanner(onCode) {
       if (navigator.vibrate) navigator.vibrate(60);
       onCode(text.trim());
     }).then(() => { btn.style.display = 'none'; })
-      .catch(() => alert('Kameraga ruxsat berilmadi. Kodni qo\'lda kiritishingiz mumkin.'));
+      .catch(() => alert('Kameraga ruxsat berilmadi. USB skaner yoki kodni qo\'lda kiritishingiz mumkin.'));
   };
 }
 function postJSON(url, body) {
@@ -32,9 +32,23 @@ function renderCart(listEl, countEl, codes, rerender) {
     const row = document.createElement('div'); row.className = 'row';
     const s = document.createElement('span'); s.textContent = c;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = '✕';
+    b.setAttribute('aria-label', 'O‘chirish: ' + c);
     b.onclick = () => { codes.splice(i, 1); rerender(); };
     row.append(s, b); listEl.append(row);
   });
   countEl.textContent = codes.length;
 }
+
+/* USB HID skaner Enter/CR yuboradi: kodni ro'yxatga qo'shib, maydonni yana tayyorlaymiz. */
+document.addEventListener('DOMContentLoaded', () => {
+  const manual = document.getElementById('manual');
+  const add = document.getElementById('add');
+  if (!manual || !add) return;
+  manual.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    add.click();
+    manual.focus();
+  });
+});
 </script>

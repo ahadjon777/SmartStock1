@@ -17,9 +17,9 @@ class EquipmentAdmin(admin.ModelAdmin):
 
 @admin.register(Movement)
 class MovementAdmin(admin.ModelAdmin):
-    list_display = ("equipment", "taken_by", "region", "out_at", "in_at", "work_hours")
-    list_filter = ("region",)
-    search_fields = ("equipment__code", "taken_by", "event")
+    list_display = ("equipment", "issued_by", "returned_by", "taken_by", "region", "out_at", "in_at", "work_hours")
+    list_filter = ("region", "issued_by", "returned_by")
+    search_fields = ("equipment__code", "equipment__name", "taken_by", "event")
 
 
 from .models import BlockedIP, SecurityEvent  # noqa: E402

@@ -2,29 +2,32 @@
 {% block title %}Qaytarish{% endblock %}
 {% block content %}
 <div class="card">
-<b>Omborga qaytarish</b>
-<p style="color:var(--m)">Qaytayotgan hamma texnikani skanerlang, oxirida "Qaytarish" ni bosing.</p>
+<b>📥 Omborga qaytarish</b>
+<p style="color:var(--m)">Qaytayotgan texnikalarni USB skaner yoki kamera bilan o'qing. Yakunda "Qaytarishni tasdiqlash" tugmasini bosing.</p>
 <div id="reader" style="width:100%"></div>
-<button id="start" type="button">Kamerani yoqish</button>
+<button id="start" type="button">📷 Kamerani yoqish</button>
 </div>
 
 <div class="card">
 <b>Skanerlangan: <span id="count">0</span> ta</b>
-<div id="list"></div>
-<input id="manual" placeholder="Kamera ishlamasa kodni yozing" style="margin-top:10px">
-<button id="add" type="button" style="background:#232a45;margin-bottom:12px">Qo'shish</button>
-<button id="send" type="button">Qaytarish</button>
-<div id="out"></div>
+<div id="list" aria-live="polite"></div>
+<label for="manual">USB skaner / inventar raqami</label>
+<input id="manual" autocomplete="off" placeholder="Kursor shu yerda tursin, QR ni skanerlang">
+<button id="add" type="button" style="background:#232a45;margin-bottom:12px">Ro'yxatga qo'shish</button>
+<button id="send" type="button">Qaytarishni tasdiqlash</button>
+<div id="out" aria-live="polite"></div>
 <div id="missing"></div>
 </div>
 {% csrf_token %}
 {% include "inventory/_scanner.html" %}
 <script>
 const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
+const manual = document.getElementById('manual');
 const redraw = () => renderCart(list, count, codes, redraw);
-function add(c) { if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
+function add(c) { c = (c || '').trim(); if (c && !codes.includes(c)) { codes.push(c); redraw(); } }
 initScanner(add);
-document.getElementById('add').onclick = () => { add(document.getElementById('manual').value.trim()); document.getElementById('manual').value = ''; };
+document.getElementById('add').onclick = () => { add(manual.value); manual.value = ''; manual.focus(); };
+manual.focus();
 document.getElementById('send').onclick = async () => {
   const d = await postJSON("{% url 'checkin_api' %}", {codes});
   let text = d.ok ? d.message : d.error;
@@ -36,7 +39,7 @@ document.getElementById('send').onclick = async () => {
     const h = document.createElement('div'); h.className = 'msg err'; h.style.marginTop = '10px';
     h.textContent = 'Hali qaytmagan: ' + d.missing.length + ' ta';
     box.append(h);
-    d.missing.forEach(m => { const row = document.createElement('div'); row.className = 'row'; row.textContent = m.code + ' ' + m.name + ' → ' + m.holder; box.append(row); });
+    d.missing.forEach(m => { const row = document.createElement('div'); row.className = 'row'; row.textContent = m.name + ' — ' + m.code + ' → ' + m.holder; box.append(row); });
   }
   if (d.ok) { const keep = codes.filter(c => bad.includes(c)); codes.length = 0; keep.forEach(c => codes.push(c)); redraw(); }
 };

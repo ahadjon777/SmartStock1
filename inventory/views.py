@@ -51,6 +51,14 @@ def _mine(user):
     return [{"code": m.equipment.code, "name": m.equipment.name} for m in moves]
 
 
+def _equipment_lines(items, limit=35):
+    """Telegram uchun avval texnika nomi, so'ng inventar/QR kodini ko'rsatadi."""
+    lines = [f"• {item.name} — {item.code}" for item in items[:limit]]
+    if len(items) > limit:
+        lines.append(f"… va yana {len(items) - limit} ta")
+    return lines
+
+
 @staff_member_required
 def labels(request):
     """QR yorliqlarni chop etish: ?warehouse=<id>&q=<kod boshlanishi>&limit=<son>."""
@@ -84,7 +92,7 @@ def checkout(request):
 @login_required
 @require_POST
 def checkout_api(request):
-    """Ombordan ko'p texnikani bir marta chiqaradi. Olgan shaxs - tizimga kirgan xodim."""
+    """Ombordan ko'p texnikani bir marta chiqaradi va bajargan xodimni qayd etadi."""
     data = _body(request)
     if data is None:
         return _bad("Noto'g'ri so'rov")
@@ -100,7 +108,7 @@ def checkout_api(request):
     now = timezone.now()
     restricted = is_restricted(request.user)
     mine = set(managed_warehouses(request.user).values_list("pk", flat=True)) if restricted else set()
-    done, skipped = [], []
+    done, skipped, completed_items = [], [], []
 
     with transaction.atomic():
         items = {e.code: e for e in Equipment.objects.select_for_update().filter(code__in=codes)}
@@ -120,10 +128,13 @@ def checkout_api(request):
                 e.status = Equipment.Status.OUT
                 e.save(update_fields=["status"])
                 done.append(code)
+                completed_items.append(e)
 
     if done:
         place = Region(region).label + (f", {event}" if event else "")
-        notify(f"📤 {me} {len(done)} ta texnika oldi ({place})")
+        text = f"📤 OMBORDAN CHIQARILDI\n👤 Mas'ul: {me}\n📍 Manzil: {place}\n📦 Soni: {len(done)}\n\n"
+        text += "\n".join(_equipment_lines(completed_items))
+        notify(text)
     return JsonResponse({
         "ok": bool(done), "done": len(done), "skipped": skipped,
         "message": f"{len(done)} ta texnika chiqarildi",
@@ -169,7 +180,7 @@ def take_api(request):
         move.holder_user = request.user
         move.save(update_fields=["holder", "holder_user"])
 
-    notify(f"📌 {me} oldi: {item.code} {item.name}")
+    notify(f"📌 TEXNIKA BIRIKTIRILDI\n👤 Xodim: {me}\n🏷 {item.name} — {item.code}")
     return JsonResponse({
         "ok": True, "mine": _mine(request.user),
         "message": f"{item.name} sizga biriktirildi",
@@ -184,7 +195,7 @@ def checkin(request):
 @login_required
 @require_POST
 def checkin_api(request):
-    """Ko'p texnikani bir marta qaytaradi va qaytmaganlarini ko'rsatadi."""
+    """Ko'p texnikani qaytaradi; qaytargan xodim harakat tarixiga yoziladi."""
     data = _body(request)
     if data is None:
         return _bad("Noto'g'ri so'rov")
@@ -195,7 +206,7 @@ def checkin_api(request):
     now = timezone.now()
     restricted = is_restricted(request.user)
     mine = set(managed_warehouses(request.user).values_list("pk", flat=True)) if restricted else set()
-    done, skipped = [], []
+    done, skipped, completed_items = [], [], []
 
     with transaction.atomic():
         items = {e.code: e for e in Equipment.objects.select_for_update().filter(code__in=codes)}
@@ -212,10 +223,12 @@ def checkin_api(request):
                 skipped.append({"code": code, "reason": "tadbirda emas"})
                 continue
             move.in_at = now
-            move.save(update_fields=["in_at"])
+            move.returned_by = request.user
+            move.save(update_fields=["in_at", "returned_by"])
             e.status = Equipment.Status.IN_STOCK
             e.save(update_fields=["status"])
             done.append(code)
+            completed_items.append(e)
 
     pending = Movement.objects.filter(in_at__isnull=True, issued_by=request.user).select_related("equipment")
     missing = [
@@ -223,9 +236,10 @@ def checkin_api(request):
         for m in pending
     ]
     if done:
-        text = f"📥 {display_name(request.user)} {len(done)} ta texnikani qaytardi"
+        text = f"📥 OMBORGA QAYTARILDI\n👤 Qabul qilgan: {display_name(request.user)}\n📦 Soni: {len(done)}\n\n"
+        text += "\n".join(_equipment_lines(completed_items))
         if missing:
-            text += f"\n⚠️ Qaytmagan: {len(missing)} ta"
+            text += f"\n\n⚠️ Shu mas'ul bo'yicha hali qaytmagan: {len(missing)} ta"
         notify(text)
     return JsonResponse({
         "ok": bool(done), "done": len(done), "skipped": skipped, "missing": missing,

@@ -51,6 +51,10 @@ class Movement(models.Model):
     issued_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, verbose_name="Bergan xodim",
     )
+    returned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="returned_movements", verbose_name="Qaytargan xodim",
+    )
     taken_by = models.CharField("Olgan shaxs (F.I.Sh.)", max_length=150)
     region = models.CharField("Hudud", max_length=20, choices=Region.choices)
     holder = models.CharField("Biriktirilgan shaxs (F.I.Sh.)", max_length=150, blank=True)
