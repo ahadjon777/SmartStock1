@@ -14,6 +14,7 @@ urlpatterns = [
     path("progress/", views.progress, name="progress"),
     path("labels/", views.labels, name="labels"),
     path("stats/", views.dashboard, name="dashboard"),
+    path("stats/region/<str:region>/", views.stats_region, name="stats_region"),
     path("panel/", panel.home, name="panel_home"),
     path("panel/out/", panel.out_now, name="panel_out"),
     path("panel/equipment/", panel.equipment_list, name="panel_equipment"),

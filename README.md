@@ -100,3 +100,9 @@ Proksi (nginx, cloudflared, ngrok) orqasida ishlasangiz `TRUST_X_FORWARDED_FOR=1
 - `/panel/equipment/` — "Hozir kimda" ustuni; sahifalash filtrlarni saqlaydi.
 - `/stats/` — hududlar bo'yicha statistika, eng ko'p ishlatilgan texnika va shaxslar.
 - `OVERDUE_DAYS` (standart 7) — "uzoq vaqt" chegarasi.
+
+## Viloyat va joy
+
+- Chiqarishda **viloyat** (Toshkent shahri, 12 viloyat, Qoraqalpog'iston Respublikasi, qo'shni davlatlar) tanlanadi va uning ichidagi **joy** (tuman/shahar/manzil) yoziladi; avval kiritilgan joylar tavsiya sifatida chiqadi.
+- `/stats/` da har bir viloyat uchun nechta joyda, nechta tadbir bo'lgani ko'rinadi; viloyat nomini bossangiz joylar → tadbirlar → texnikalar to'liq ochiladi (`/stats/region/<viloyat>/`).
+- Eski «Boshqa viloyatlar» yozuvlari saqlanadi (eski deb belgilanadi), yangi chiqarishda tanlanmaydi. Yangilangandan keyin `python manage.py migrate` kerak.

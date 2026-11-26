@@ -14,8 +14,11 @@
 <label for="manual">USB skaner / inventar raqami</label>
 <input id="manual" autocomplete="off" placeholder="Kursor shu yerda tursin, QR ni skanerlang">
 <button id="add" type="button" style="background:#232a45;margin-bottom:12px">Ro'yxatga qo'shish</button>
-<label for="region">Hudud</label>
+<label for="region">Viloyat</label>
 <select id="region">{% for value, label in regions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+<label for="place">Joy (tuman / shahar / manzil)</label>
+<input id="place" list="places" autocomplete="off" placeholder="Masalan: Urgut tumani, Madaniyat saroyi">
+<datalist id="places"></datalist>
 <label for="event">Tadbir (ixtiyoriy)</label>
 <input id="event" placeholder="Tadbir nomi">
 <button id="send" type="button">Chiqarishni tasdiqlash</button>
@@ -23,7 +26,15 @@
 </div>
 {% csrf_token %}
 {% include "inventory/_scanner.html" %}
+{{ places|json_script:"places-data" }}
 <script>
+const PLACES = JSON.parse(document.getElementById('places-data').textContent);
+const regionSel = document.getElementById('region'), dl = document.getElementById('places');
+function fillPlaces() {
+  dl.innerHTML = '';
+  (PLACES[regionSel.value] || []).forEach(p => { const o = document.createElement('option'); o.value = p; dl.append(o); });
+}
+regionSel.addEventListener('change', fillPlaces); fillPlaces();
 const codes = [], list = document.getElementById('list'), count = document.getElementById('count'), out = document.getElementById('out');
 const manual = document.getElementById('manual');
 const redraw = () => renderCart(list, count, codes, redraw);
@@ -37,7 +48,7 @@ document.getElementById('send').onclick = async ev => {
   btn.disabled = true;
   try {
     const d = await postJSON("{% url 'checkout_api' %}", {
-      codes, region: document.getElementById('region').value, event: document.getElementById('event').value
+      codes, region: regionSel.value, place: document.getElementById('place').value, event: document.getElementById('event').value
     });
     let text = d.ok ? d.message : d.error;
     const bad = (d.skipped || []).map(s => s.code);

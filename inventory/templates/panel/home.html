@@ -23,15 +23,15 @@
 <h3 class="t">Kimda nima</h3>
 <div class="sub2" style="margin-bottom:8px">Har bir chiqarish bo'yicha: texnikaning nechtasi xodimlarga biriktirilgan.</div>
 <table>
-<tr><th>Kim olgan</th><th>Hudud / tadbir</th><th>Texnika</th><th>Biriktirilgan</th><th>Qancha vaqt</th><th></th></tr>
+<tr><th>№</th><th>Kim olgan</th><th>Viloyat / joy / tadbir</th><th>Texnika</th><th>Biriktirilgan</th><th>Qancha vaqt</th><th></th></tr>
 {% for g in people %}<tr>
-<td><b>{{ g.person }}</b></td>
-<td>{{ g.region }}{% if g.event %}<small>{{ g.event }}</small>{% endif %}</td>
+<td>{{ forloop.counter }}</td><td><b>{{ g.person }}</b></td>
+<td>{{ g.region }}{% if g.place %} · {{ g.place }}{% endif %}{% if g.event %}<small>{{ g.event }}</small>{% endif %}</td>
 <td>{{ g.total }} ta</td>
 <td style="min-width:120px"><div class="pbar{% if g.left %} o{% endif %}"><i style="width:{{ g.pct }}%"></i></div><small>{{ g.assigned }} / {{ g.total }}{% if g.left %} · <span class="cell-o">{{ g.left }} ta qoldi</span>{% else %} · hammasi ✓{% endif %}</small></td>
 <td class="{% if g.long %}cell-r{% endif %}">{{ g.since }}</td>
 <td><a class="l" href="{% url 'panel_out' %}?q={{ g.person|urlencode }}">Ko'rish</a></td>
-</tr>{% empty %}<tr><td colspan="6" class="muted">Hozir tadbirda texnika yo'q ✅</td></tr>{% endfor %}
+</tr>{% empty %}<tr><td colspan="7" class="muted">Hozir tadbirda texnika yo'q ✅</td></tr>{% endfor %}
 </table>
 </div>
 

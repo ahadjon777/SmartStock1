@@ -1,0 +1,40 @@
+{% extends "inventory/base.html" %}
+{% block title %}{{ region_label }}{% endblock %}
+{% block head %}<style>
+.w{max-width:960px}
+details.pl{background:var(--c,#171c33);border:1px solid #2a3155;border-radius:14px;margin:0 0 10px;padding:0}
+details.pl>summary{cursor:pointer;padding:12px 14px;list-style:none;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:center}
+details.pl>summary::-webkit-details-marker{display:none}
+details.pl>summary b{font-size:1.05rem}
+.chip{font-size:.78rem;padding:2px 9px;border-radius:99px;border:1px solid #2a3155;color:var(--m);white-space:nowrap}
+.chip.o{color:#ffb86b;border-color:#ffb86b55}
+.body{padding:0 14px 12px;overflow-x:auto}
+details.ev{border-top:1px solid #232a45;padding:8px 0}
+details.ev>summary{cursor:pointer}
+.sub{color:var(--m);font-size:.82rem}
+table.in{width:100%;margin-top:6px}
+table.in td{font-size:.88rem;padding:4px 6px}
+a.back{color:var(--b);text-decoration:none}
+</style>{% endblock %}
+{% block content %}
+<p><a class="back" href="{% url 'dashboard' %}?period={{ current }}">← Statistika</a></p>
+<div class="card">
+<b style="font-size:1.2rem">{{ region_label }}</b>
+<div class="sub" style="margin-top:6px">{{ period_label }} davomida: <b>{{ place_count }}</b> ta joyda, <b>{{ events }}</b> ta tadbir, <b>{{ items }}</b> ta texnika harakati.</div>
+</div>
+<div class="tabs">
+{% for key, label in periods %}<a href="?period={{ key }}" class="{% if key == current %}on{% endif %}">{{ label }}</a>{% endfor %}
+</div>
+{% for p in places %}
+<details class="pl"{% if forloop.first and places|length == 1 %} open{% endif %}>
+<summary><span><b>{{ forloop.counter }}. {{ p.name }}</b></span>
+<span><span class="chip">{{ p.events_count }} ta tadbir</span> <span class="chip">{{ p.items }} ta texnika</span>{% if p.open %} <span class="chip o">{{ p.open }} ta hozir tadbirda</span>{% endif %}</span></summary>
+<div class="body">
+<div class="sub">Oxirgi: {{ p.last|date:"d.m.Y H:i" }} · Mas'ullar: {{ p.people|join:", " }}</div>
+{% for e in p.events %}<details class="ev"><summary><b>{{ e.when|date:"d.m.Y H:i" }}</b> · {{ e.person }}{% if e.event %} · «{{ e.event }}»{% endif %} · {{ e.rows|length }} ta texnika{% if e.open %} <span class="chip o">{{ e.open }} ta tadbirda</span>{% endif %}{% if e.avg is not None %} <span class="chip">ish: {{ e.avg }} soat</span>{% endif %}</summary>
+<table class="in"><tr><th>№</th><th>Texnika</th><th>Inv. №</th><th>Biriktirilgan</th><th>Qaytdi</th></tr>
+{% for r in e.rows %}<tr><td>{{ forloop.counter }}</td><td>{{ r.name }}</td><td>{{ r.code }}</td><td>{% if r.holder %}{{ r.holder }}{% else %}<span class="sub">—</span>{% endif %}</td><td>{% if r.in_at %}{{ r.in_at|date:"d.m H:i" }}{% else %}<span class="chip o">tadbirda</span>{% endif %}</td></tr>{% endfor %}
+</table></details>{% endfor %}
+</div></details>
+{% empty %}<div class="card sub">Bu davrda bu viloyatda tadbir bo'lmagan.</div>{% endfor %}
+{% endblock %}

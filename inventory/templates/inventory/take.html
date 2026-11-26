@@ -36,7 +36,7 @@ function drawMine() {
     const row = document.createElement('div'); row.className = 'row';
     const info = document.createElement('div');
     const t = document.createElement('div'); t.textContent = it.code + ' — ' + it.name; info.append(t);
-    const sub = [it.region, it.event].filter(Boolean).join(' · ');
+    const sub = [it.region, it.place, it.event].filter(Boolean).join(' · ');
     if (sub) { const s = document.createElement('small'); s.className = 'muted'; s.textContent = sub; info.append(s); }
     const b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = "Bo'shatish";
     b.onclick = () => release(it);

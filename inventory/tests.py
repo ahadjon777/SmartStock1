@@ -306,7 +306,7 @@ class BotScreenTests(TestCase):
         self.out("A-1", "Kamera")
         text, rows = bot_data.stats_screen("hafta")
         self.assertIn("• Hafta", [label for row in rows for label, _ in row])
-        self.assertIn("Toshkent shahri", text)
+        self.assertIn("Toshkent viloyati", text)
         self.assertIn("m:st:oy", _all_callbacks(bot_data.stats_screen("noma'lum")[1]) + ["m:st:oy"])
         text, _ = bot_data.warehouses_screen()
         self.assertIn("Asosiy ombor", text)
@@ -614,3 +614,69 @@ class PanelStatsTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context["out_now"], 2)
         self.assertEqual(r.context["out_pct"], 67)
+
+
+class RegionPlaceTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Movement
+        self.boss = User.objects.create_user(username="boss", password="x", first_name="Boss Bossov", is_staff=True)
+        self.client.force_login(self.boss)
+        self.wh = Warehouse.objects.create(name="Asosiy")
+        now = timezone.now()
+        # Samarqand viloyatida 5 ta turli joyda tadbir (biri ikki marta, katta-kichik harf farqi bilan)
+        for i, place in enumerate(["Urgut", "Kattaqo'rg'on", "Bulung'ur", "Samarqand shahri", "Pastdarg'om", "urgut"]):
+            e = Equipment.objects.create(code=f"S{i}", name=f"Texnika {i}", warehouse=self.wh)
+            Movement.objects.create(equipment=e, taken_by="Vali", region="samarkand", place=place,
+                                    event="Forum", out_at=now - timedelta(days=i + 1),
+                                    in_at=now - timedelta(days=i + 1) + timedelta(hours=4))
+        e = Equipment.objects.create(code="B1", name="Buxoro texnika", warehouse=self.wh)
+        Movement.objects.create(equipment=e, taken_by="Vali", region="bukhara", out_at=now - timedelta(days=2))
+
+    def test_region_list_covers_uzbekistan(self):
+        from .models import Region
+        values = dict(Region.selectable())
+        self.assertEqual(len(values), 15)  # shahar + 12 viloyat + Qoraqalpog'iston + chet el
+        self.assertIn("karakalpakstan", values)
+        self.assertNotIn("other_regions", values)
+        self.assertEqual(Region.label_of("other_regions"), "Boshqa viloyatlar (eski)")
+
+    @patch("inventory.views.notify")
+    def test_checkout_saves_place_and_rejects_legacy_region(self, notify):
+        Equipment.objects.create(code="N1", name="Yangi", warehouse=self.wh)
+        r = _post(self.client, "checkout_api", {"codes": ["N1"], "region": "other_regions"})
+        self.assertEqual(r.status_code, 400)
+        r = _post(self.client, "checkout_api", {"codes": ["N1"], "region": "fergana", "place": "  Qo'qon   shahri ", "event": "Konsert"})
+        self.assertTrue(r.json()["ok"])
+        from .models import Movement
+        m = Movement.objects.get(equipment__code="N1")
+        self.assertEqual((m.region, m.place), ("fergana", "Qo'qon shahri"))
+        self.assertIn("Farg'ona viloyati · Qo'qon shahri", notify.call_args[0][0])
+
+    def test_summary_counts_places_per_region(self):
+        from . import regstats
+        rows = {r["value"]: r for r in regstats.region_summary(regstats.since_for(30))}
+        self.assertEqual(rows["samarkand"]["places"], 5)  # "Urgut" va "urgut" bitta joy
+        self.assertEqual(rows["samarkand"]["events"], 6)
+        self.assertEqual(rows["bukhara"]["places"], 0)
+        self.assertEqual(rows["bukhara"]["items"], 1)
+
+    def test_dashboard_and_region_detail_pages(self):
+        r = self.client.get(reverse("dashboard"))
+        self.assertContains(r, "5 ta joyda")
+        self.assertContains(r, reverse("stats_region", args=["samarkand"]))
+        r = self.client.get(reverse("stats_region", args=["samarkand"]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["place_count"], 5)
+        self.assertContains(r, "Kattaqo&#x27;rg&#x27;on")
+        self.assertContains(r, "Forum")
+        r = self.client.get(reverse("stats_region", args=["bukhara"]))
+        self.assertContains(r, "Joy ko&#x27;rsatilmagan")
+        self.assertEqual(self.client.get(reverse("stats_region", args=["nowhere"])).status_code, 404)
+
+    def test_numbered_lists_and_place_shown(self):
+        r = self.client.get(reverse("panel_equipment"))
+        self.assertContains(r, "<th>№</th>")
+        r = self.client.get(reverse("panel_out"))
+        self.assertContains(r, "Buxoro viloyati")

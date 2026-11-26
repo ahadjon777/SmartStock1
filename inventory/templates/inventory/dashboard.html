@@ -1,9 +1,9 @@
 {% extends "inventory/base.html" %}
 {% block title %}Statistika{% endblock %}
 {% block head %}<style>
-.w{max-width:900px}
+.w{max-width:960px}
 .kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
-@media(min-width:700px){.kpi{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:700px){.kpi{grid-template-columns:repeat(5,1fr)}}
 .kpi .card{margin:0}
 .kpi b{display:block;font-size:1.8rem}
 .kpi span{color:var(--m);font-size:.85rem}
@@ -11,33 +11,42 @@
 .pbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b))}
 .hint{color:var(--m);font-size:.85rem;margin:8px 0 0}
 td small{display:block;color:var(--m);font-size:.78rem}
+td a.go{color:var(--b);text-decoration:none;font-weight:700}
+tr.idle td{color:var(--m)}
 .two{display:grid;gap:12px}
 @media(min-width:700px){.two{grid-template-columns:1fr 1fr}}
 </style>{% endblock %}
 {% block content %}
 <div class="kpi">
-<div class="card"><b>{{ total }}</b><span>Jami texnika</span></div>
+<div class="card"><b>{{ regions_active }}</b><span>Faol viloyat ({{ period_label|lower }})</span></div>
+<div class="card"><b>{{ places }}</b><span>Turli joylar</span></div>
+<div class="card"><b>{{ events }}</b><span>Tadbirlar (chiqarishlar)</span></div>
 <div class="card"><b>{{ out_now }}</b><span>Hozir tadbirda ({{ out_pct }}%)</span></div>
-<div class="card"><b>{{ done }}</b><span>Qaytarilgan ({{ period_label|lower }})</span></div>
+<div class="card"><b>{{ total }}</b><span>Jami texnika</span></div>
 </div>
 <div class="tabs">
 {% for key, label in periods %}<a href="?period={{ key }}" class="{% if key == current %}on{% endif %}">{{ label }}</a>{% endfor %}
 </div>
 <div class="card" style="overflow-x:auto">
-<b>Hududlar bo'yicha ({{ period_label }})</b>
+<b>Viloyatlar bo'yicha ({{ period_label }})</b>
 <table>
-<tr><th>Hudud</th><th>Tadbir soni</th><th></th><th>O'rtacha ishlash vaqti</th><th>O'rtacha band bo'lgan vaqt</th></tr>
-{% for r in rows %}<tr><td>{{ r.region }}</td><td>{{ r.count }}</td>
-<td style="min-width:100px"><div class="pbar"><i style="width:{{ r.pct }}%"></i></div></td>
-<td>{% if r.count %}{{ r.avg }} soat{% else %}—{% endif %}</td>
-<td>{% if r.count %}{{ r.avg_total }} soat{% else %}—{% endif %}</td></tr>{% endfor %}
+<tr><th>№</th><th>Viloyat</th><th>Joylar</th><th>Tadbirlar</th><th></th><th>Texnika</th><th>O'rtacha ish vaqti</th><th></th></tr>
+{% for r in rows %}<tr class="{% if not r.items %}idle{% endif %}">
+<td>{{ forloop.counter }}</td>
+<td>{% if r.items %}<a class="go" href="{% url 'stats_region' r.value %}?period={{ current }}">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}</td>
+<td>{% if r.items %}{{ r.places }} ta joyda{% else %}—{% endif %}</td>
+<td>{% if r.items %}{{ r.events }} ta{% else %}—{% endif %}</td>
+<td style="min-width:90px"><div class="pbar"><i style="width:{{ r.pct }}%"></i></div></td>
+<td>{% if r.items %}{{ r.items }}{% else %}—{% endif %}</td>
+<td>{% if r.done %}{{ r.avg }} soat{% else %}—{% endif %}</td>
+<td>{% if r.items %}<a class="go" href="{% url 'stats_region' r.value %}?period={{ current }}">Batafsil →</a>{% endif %}</td></tr>{% endfor %}
 </table>
-<p class="hint"><b>Tadbir soni</b> — tanlangan davrda qaytarilgan texnika harakatlari. <b>Ishlash vaqti</b> — chiqish–qaytish vaqtining yarmi (yoki qo'lda kiritilgani). <b>Band bo'lgan vaqt</b> — chiqishdan qaytishgacha to'liq o'tgan vaqt.</p>
+<p class="hint"><b>Joylar</b> — viloyatning nechta turli joyida tadbir bo'lgani. <b>Tadbirlar</b> — shu davrdagi chiqarishlar soni. <b>Texnika</b> — chiqarilgan texnika harakatlari. <b>Ish vaqti</b> — chiqish–qaytish vaqtining yarmi (yoki qo'lda kiritilgani); faqat qaytarilganlar hisoblanadi. Viloyat nomini bossangiz, to'liq ma'lumot ochiladi.</p>
 </div>
 <div class="two">
 <div class="card"><b>Eng ko'p ishlatilgan texnika</b>
-<table>{% for i in top_items %}<tr><td>{{ i.name }}<small>inv. № {{ i.code }}</small></td><td>{{ i.count }} marta</td></tr>{% empty %}<tr><td class="muted">Ma'lumot yo'q</td></tr>{% endfor %}</table></div>
+<table>{% for i in top_items %}<tr><td>{{ forloop.counter }}.</td><td>{{ i.name }}<small>inv. № {{ i.code }}</small></td><td>{{ i.count }} marta</td></tr>{% empty %}<tr><td class="muted">Ma'lumot yo'q</td></tr>{% endfor %}</table></div>
 <div class="card"><b>Eng ko'p olgan shaxslar</b>
-<table>{% for p in top_people %}<tr><td>{{ p.name }}</td><td>{{ p.count }} marta</td></tr>{% empty %}<tr><td class="muted">Ma'lumot yo'q</td></tr>{% endfor %}</table></div>
+<table>{% for p in top_people %}<tr><td>{{ forloop.counter }}.</td><td>{{ p.name }}</td><td>{{ p.count }} marta</td></tr>{% empty %}<tr><td class="muted">Ma'lumot yo'q</td></tr>{% endfor %}</table></div>
 </div>
 {% endblock %}

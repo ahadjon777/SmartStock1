@@ -6,10 +6,32 @@ from django.db import models
 
 
 class Region(models.TextChoices):
+    """O'zbekiston: Toshkent shahri, 12 viloyat, Qoraqalpog'iston Respublikasi (+ chet el)."""
     TASHKENT_CITY = "tashkent_city", "Toshkent shahri"
     TASHKENT_REGION = "tashkent_region", "Toshkent viloyati"
-    OTHER_REGIONS = "other_regions", "Boshqa viloyatlar"
+    ANDIJAN = "andijan", "Andijon viloyati"
+    BUKHARA = "bukhara", "Buxoro viloyati"
+    FERGANA = "fergana", "Farg'ona viloyati"
+    JIZZAKH = "jizzakh", "Jizzax viloyati"
+    KASHKADARYA = "kashkadarya", "Qashqadaryo viloyati"
+    KHOREZM = "khorezm", "Xorazm viloyati"
+    NAMANGAN = "namangan", "Namangan viloyati"
+    NAVOI = "navoi", "Navoiy viloyati"
+    SAMARKAND = "samarkand", "Samarqand viloyati"
+    SIRDARYA = "sirdarya", "Sirdaryo viloyati"
+    SURKHANDARYA = "surkhandarya", "Surxondaryo viloyati"
+    KARAKALPAKSTAN = "karakalpakstan", "Qoraqalpog'iston Respublikasi"
     ABROAD = "abroad", "Qo'shni davlatlar"
+    # Eski yozuvlar uchun; yangi chiqarishda tanlanmaydi
+    OTHER_REGIONS = "other_regions", "Boshqa viloyatlar (eski)"
+
+    @classmethod
+    def selectable(cls):
+        return [(v, l) for v, l in cls.choices if v != cls.OTHER_REGIONS]
+
+    @classmethod
+    def label_of(cls, value):
+        return cls(value).label if value in cls.values else (value or "")
 
 
 class Warehouse(models.Model):
@@ -62,6 +84,7 @@ class Movement(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="held", verbose_name="Biriktirilgan xodim (login)",
     )
+    place = models.CharField("Joy (tuman/shahar/manzil)", max_length=200, blank=True)
     event = models.CharField("Tadbir", max_length=200, blank=True)
     out_at = models.DateTimeField("Chiqqan vaqt")
     in_at = models.DateTimeField("Qaytgan vaqt", null=True, blank=True)
@@ -73,6 +96,11 @@ class Movement(models.Model):
         verbose_name = "Harakat"
         verbose_name_plural = "Harakatlar"
         ordering = ["-out_at"]
+
+    @property
+    def where(self):
+        """«Samarqand viloyati · Urgut tumani»"""
+        return " · ".join(x for x in (Region.label_of(self.region), self.place) if x)
 
     @property
     def total_hours(self):

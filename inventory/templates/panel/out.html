@@ -23,21 +23,23 @@
 <div class="card tw">
 <table>
 <tr>
+<th>№</th>
 <th><a class="l" href="{{ sort_links.name }}">Texnika ↕</a></th>
 <th><a class="l" href="{{ sort_links.person }}">Kim olgan ↕</a></th>
 <th><a class="l" href="{{ sort_links.holder }}">Kimga biriktirilgan ↕</a></th>
-<th>Hudud / tadbir</th>
+<th>Viloyat / joy / tadbir</th>
 <th><a class="l" href="{{ sort_links.date }}">Chiqqan vaqt ↕</a></th>
 <th>Qancha vaqt</th>
 </tr>
 {% for m in rows %}<tr>
+<td>{{ forloop.counter }}</td>
 <td>{{ m.short }}<small>inv. № {{ m.equipment.code }} · {{ m.equipment.warehouse.name }}</small></td>
 <td>{{ m.taken_by }}</td>
 <td>{% if m.holder %}<b>{{ m.holder }}</b>{% else %}<span class="tag w">biriktirilmagan</span>{% endif %}</td>
-<td>{{ m.region_name }}{% if m.event %}<small>{{ m.event }}</small>{% endif %}</td>
+<td>{{ m.region_name }}{% if m.place %} · {{ m.place }}{% endif %}{% if m.event %}<small>{{ m.event }}</small>{% endif %}</td>
 <td>{{ m.out_at|date:"d.m.Y" }}<small>{{ m.out_at|date:"H:i" }}</small></td>
 <td class="{% if m.long %}cell-r{% endif %}">{{ m.since }}{% if m.long %}<small class="cell-r">uzoq vaqt</small>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="6" class="muted">{% if q or state or warehouse %}Bu filtr bo'yicha hech narsa topilmadi.{% else %}Hozir tadbirda texnika yo'q ✅{% endif %}</td></tr>{% endfor %}
+</tr>{% empty %}<tr><td colspan="7" class="muted">{% if q or state or warehouse %}Bu filtr bo'yicha hech narsa topilmadi.{% else %}Hozir tadbirda texnika yo'q ✅{% endif %}</td></tr>{% endfor %}
 </table>
 </div>
 {% endblock %}

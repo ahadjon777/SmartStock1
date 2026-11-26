@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from . import reports, security
 from .access import display_name
-from .fmt import short_name
+from .fmt import short_name, where
 from .version import BUILD
 from .models import BlockedIP, Equipment, Movement, Region, SecurityEvent, SecurityState, Warehouse
 
@@ -54,7 +54,7 @@ def ago(dt):
 
 
 def region_label(value):
-    return Region(value).label if value in Region.values else value
+    return Region.label_of(value)
 
 
 def _tail(refresh):
@@ -127,14 +127,14 @@ def help_screen():
 def out_screen(page=0):
     moves = list(
         Movement.objects.filter(in_at__isnull=True)
-        .select_related("equipment").order_by("taken_by", "region", "event", "equipment__code")
+        .select_related("equipment").order_by("taken_by", "region", "place", "event", "equipment__code")
     )
     if not moves:
         return "<b>📦 Tadbirda</b>\n\nHozir tadbirda texnika yo'q ✅", _tail("m:out:0")
 
     groups = OrderedDict()
     for m in moves:
-        groups.setdefault((m.taken_by, m.region, m.event), []).append(m)
+        groups.setdefault((m.taken_by, m.region, m.place, m.event), []).append(m)
     items = list(groups.items())
     pages = max(1, math.ceil(len(items) / PER_PAGE))
     page = min(max(int(page), 0), pages - 1)
@@ -143,15 +143,15 @@ def out_screen(page=0):
     if pages > 1:
         lines[0] += f" · {page + 1}/{pages}"
     lines.append("")
-    for (person, region, event), rows_ in items[page * PER_PAGE:(page + 1) * PER_PAGE]:
-        head = f"👤 <b>{esc(person)}</b> · {len(rows_)} ta · 📍 {esc(region_label(region))}"
+    for (person, region, place, event), rows_ in items[page * PER_PAGE:(page + 1) * PER_PAGE]:
+        head = f"👤 <b>{esc(person)}</b> · {len(rows_)} ta · 📍 {esc(where(region_label(region), place))}"
         if event:
             head += f" · «{esc(event)}»"
         head += f" · ⏱ {ago(min(m.out_at for m in rows_))}"
         lines.append(head)
-        for m in rows_[:MAX_ITEMS]:
+        for n, m in enumerate(rows_[:MAX_ITEMS], 1):
             who = esc(m.holder) if m.holder else "<i>biriktirilmagan</i>"
-            lines.append(f"   • {esc(short_name(m.equipment.name))} · inv. № <code>{esc(m.equipment.code)}</code> → {who}")
+            lines.append(f"   {n}. {esc(short_name(m.equipment.name))} · inv. № <code>{esc(m.equipment.code)}</code> → {who}")
         if len(rows_) > MAX_ITEMS:
             lines.append(f"   … yana {len(rows_) - MAX_ITEMS} ta")
         lines.append("")
@@ -257,7 +257,7 @@ def equipment_card(pk):
     current = next((m for m in moves if m.in_at is None), None)
     if current:
         lines += ["", f"👤 Olgan: {esc(current.taken_by)}"]
-        place = esc(region_label(current.region)) + (f" · «{esc(current.event)}»" if current.event else "")
+        place = esc(where(region_label(current.region), current.place)) + (f" · «{esc(current.event)}»" if current.event else "")
         lines.append(f"📍 {place}")
         lines.append(f"📌 Biriktirilgan: {esc(current.holder) if current.holder else '<i>biriktirilmagan</i>'}")
         lines.append(f"⏱ Chiqqan: {when(current.out_at)} ({ago(current.out_at)} oldin)")
@@ -267,7 +267,7 @@ def equipment_card(pk):
         for m in history:
             hours = m.work_hours
             lines.append(
-                f"• {when(m.out_at)} → {when(m.in_at)} · {esc(m.taken_by)} · {esc(region_label(m.region))}"
+                f"• {when(m.out_at)} → {when(m.in_at)} · {esc(m.taken_by)} · {esc(where(region_label(m.region), m.place))}"
                 + (f" · ish: {hours.quantize(Decimal('0.1'))} soat" if hours is not None else "")
             )
     rows = [[("🔄 Yangilash", f"e:{pk}"), ("🔎 Yangi qidiruv", "m:find")], [("🏠 Menyu", "m:home")]]

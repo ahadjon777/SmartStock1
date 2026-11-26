@@ -14,3 +14,8 @@ def short_name(name, limit=28):
 def item_label(equipment, limit=28):
     """«Kamera · inv. № 011010400001»: inventar raqami = texnikaning QR kodi."""
     return f"{short_name(equipment.name, limit)} · inv. № {equipment.code}"
+
+
+def where(region_label, place=""):
+    """Hudud va joyni bitta qatorga: «Samarqand viloyati · Urgut tumani»."""
+    return " · ".join(x for x in (region_label, (place or "").strip()) if x)

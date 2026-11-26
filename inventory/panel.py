@@ -65,7 +65,7 @@ def overdue_days():
 
 
 def region_label(value):
-    return Region(value).label if value in Region.values else value
+    return Region.label_of(value)
 
 
 def csv_safe(value):
@@ -121,8 +121,8 @@ def home(request):
     # Kimda nima: har bir chiqarish (kim + hudud + tadbir) bo'yicha guruh
     groups = OrderedDict()
     for m in open_mv.select_related("equipment").order_by("out_at"):
-        g = groups.setdefault((m.taken_by, m.region, m.event), {
-            "person": m.taken_by, "region": region_label(m.region), "event": m.event,
+        g = groups.setdefault((m.taken_by, m.region, m.place, m.event), {
+            "person": m.taken_by, "region": region_label(m.region), "place": m.place, "event": m.event,
             "total": 0, "assigned": 0, "oldest": m.out_at,
         })
         g["total"] += 1
@@ -174,7 +174,7 @@ def out_now(request):
     if q:
         qs = qs.filter(
             Q(equipment__code__icontains=q) | Q(equipment__name__icontains=q)
-            | Q(taken_by__icontains=q) | Q(holder__icontains=q) | Q(event__icontains=q)
+            | Q(taken_by__icontains=q) | Q(holder__icontains=q) | Q(event__icontains=q) | Q(place__icontains=q)
         )
     warehouse = request.GET.get("warehouse", "")
     if warehouse.isdigit():
@@ -194,11 +194,11 @@ def out_now(request):
         resp["Content-Disposition"] = f'attachment; filename="tadbirda-{timezone.localdate():%Y-%m-%d}.csv"'
         resp.write("\ufeff")  # Excel kirill/o'zbek harflarini to'g'ri ochishi uchun
         w = csv.writer(resp)
-        w.writerow(["Inventar №", "Nomi", "Olgan shaxs", "Biriktirilgan shaxs", "Hudud", "Tadbir", "Ombor", "Chiqqan vaqt", "Qancha vaqt"])
+        w.writerow(["Inventar №", "Nomi", "Olgan shaxs", "Biriktirilgan shaxs", "Viloyat", "Joy", "Tadbir", "Ombor", "Chiqqan vaqt", "Qancha vaqt"])
         for m in rows:
             w.writerow([csv_safe(v) for v in (
                 m.equipment.code, m.equipment.name, m.taken_by, m.holder or "biriktirilmagan",
-                region_label(m.region), m.event, m.equipment.warehouse.name,
+                region_label(m.region), m.place, m.event, m.equipment.warehouse.name,
                 timezone.localtime(m.out_at).strftime("%d.%m.%Y %H:%M"), human(now - m.out_at),
             )])
         return resp

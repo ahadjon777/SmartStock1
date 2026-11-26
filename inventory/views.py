@@ -7,7 +7,7 @@ import segno
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -15,6 +15,8 @@ from django.views.decorators.http import require_POST
 
 from .access import display_name, is_admin, is_restricted, managed_warehouses
 from .fmt import item_label, short_name
+from .fmt import where as fmt_where
+from . import regstats
 from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
 from .version import BUILD
@@ -73,7 +75,7 @@ def _mine(user):
     return [
         {
             "code": m.equipment.code, "name": m.equipment.name, "event": m.event,
-            "region": Region(m.region).label if m.region in Region.values else "",
+            "region": Region.label_of(m.region), "place": m.place,
         }
         for m in moves
     ]
@@ -131,7 +133,12 @@ def scan(request):
 
 @login_required
 def checkout(request):
-    return render(request, "inventory/out.html", {"regions": Region.choices})
+    places = defaultdict(list)
+    for region, place in (Movement.objects.exclude(place="").values_list("region", "place")
+                          .distinct().order_by("place")):
+        if place not in places[region]:
+            places[region].append(place)
+    return render(request, "inventory/out.html", {"regions": Region.selectable(), "places": dict(places)})
 
 
 @login_required
@@ -143,11 +150,12 @@ def checkout_api(request):
         return _bad("Noto'g'ri so'rov")
     codes = _codes(data)
     region = data.get("region")
-    event = (data.get("event") or "").strip()
+    event = (data.get("event") or "").strip()[:200]
+    place = " ".join((data.get("place") or "").split())[:200]
     if not codes:
         return _bad("Kamida bitta texnikani skanerlang")
-    if region not in Region.values:
-        return _bad("Hududni tanlang")
+    if region not in dict(Region.selectable()):
+        return _bad("Viloyatni tanlang")
 
     me = display_name(request.user)
     now = timezone.now()
@@ -168,7 +176,7 @@ def checkout_api(request):
             else:
                 Movement.objects.create(
                     equipment=e, issued_by=request.user, taken_by=me,
-                    region=region, event=event, out_at=now,
+                    region=region, place=place, event=event, out_at=now,
                 )
                 e.status = Equipment.Status.OUT
                 e.save(update_fields=["status"])
@@ -176,7 +184,7 @@ def checkout_api(request):
                 completed_items.append(e)
 
     if done:
-        place = Region(region).label + (f", {event}" if event else "")
+        place = fmt_where(Region.label_of(region), place) + (f", {event}" if event else "")
         text = f"📤 OMBORDAN CHIQARILDI\n👤 Mas'ul: {me}\n📍 Manzil: {place}\n📦 Soni: {len(done)}\n\n"
         text += "\n".join(_equipment_lines(completed_items))
         notify(text, [[("📦 Tadbirda nima bor", "n:out")]])
@@ -356,29 +364,12 @@ def dashboard(request):
         key = "month"
     since = timezone.now() - timedelta(days=PERIODS[key][1])
 
-    sums = defaultdict(lambda: [Decimal("0"), Decimal("0"), 0])
+    rows = regstats.region_summary(since)
     by_item = defaultdict(int)
     by_person = defaultdict(int)
-    qs = Movement.objects.filter(in_at__isnull=False, in_at__gte=since).select_related("equipment")
-    for m in qs:
-        s = sums[m.region]
-        s[0] += m.work_hours
-        s[1] += m.total_hours
-        s[2] += 1
+    for m in Movement.objects.filter(out_at__gte=since).select_related("equipment"):
         by_item[(m.equipment.code, m.equipment.name)] += 1
         by_person[m.taken_by] += 1
-
-    rows = []
-    done = 0
-    for value, label in Region.choices:
-        work, total_h, count = sums.get(value, [Decimal("0"), Decimal("0"), 0])
-        done += count
-        avg = (work / count).quantize(Decimal("0.01")) if count else Decimal("0")
-        avg_total = (total_h / count).quantize(Decimal("0.01")) if count else Decimal("0")
-        rows.append({"region": label, "count": count, "avg": avg, "avg_total": avg_total})
-    top = max((r["count"] for r in rows), default=0) or 1
-    for r in rows:
-        r["pct"] = round(r["count"] * 100 / top)
 
     out_now = Equipment.objects.filter(status=Equipment.Status.OUT).count()
     total = Equipment.objects.count()
@@ -392,8 +383,29 @@ def dashboard(request):
         "out_now": out_now,
         "total": total,
         "out_pct": round(out_now * 100 / total) if total else 0,
-        "done": done,
+        "events": sum(r["events"] for r in rows),
+        "places": sum(r["places"] for r in rows),
+        "regions_active": sum(1 for r in rows if r["items"]),
         "top_items": [{"code": c, "name": short_name(n), "count": k} for (c, n), k in top_items],
         "top_people": [{"name": n, "count": k} for n, k in top_people],
         "now": timezone.now(),
+    })
+
+
+@login_required
+def stats_region(request, region):
+    """Bitta viloyat: qaysi joylarda, qachon, kim, qaysi texnika bilan tadbir bo'lgani."""
+    if region not in Region.values:
+        raise Http404
+    key = request.GET.get("period", "month")
+    if key not in PERIODS:
+        key = "month"
+    places = regstats.region_detail(timezone.now() - timedelta(days=PERIODS[key][1]), region)
+    return render(request, "inventory/stats_region.html", {
+        "region_label": Region.label_of(region), "places": places, "current": key,
+        "period_label": PERIODS[key][0],
+        "periods": [(k, v[0]) for k, v in PERIODS.items()],
+        "events": sum(p["events_count"] for p in places),
+        "items": sum(p["items"] for p in places),
+        "place_count": sum(1 for p in places if p["name"] != regstats.NO_PLACE),
     })
