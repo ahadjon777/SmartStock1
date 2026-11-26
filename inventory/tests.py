@@ -441,12 +441,13 @@ class QrLabelTests(TestCase):
             qr = make_qr(code)
             self.assertFalse(qr.is_micro, code)
             self.assertGreaterEqual(qr.symbol_size(border=0)[0], 21, code)
+            self.assertEqual(qr.mask, 4, code)  # brauzer skaneri uchun eng ishonchli niqob
 
     def test_quiet_zone_is_at_least_four_modules(self):
         qr = make_qr("0110104000001")
         modules = qr.symbol_size(border=0)[0]
-        # svg_inline(scale=4, border=4) -> (modul + 2*4 ta bo'sh modul) * 4 piksel
-        self.assertIn(f'width="{(modules + 8) * 4}"', qr_svg("0110104000001"))
+        # svg_inline(scale=6, border=4) -> (modul + 2*4 ta bo'sh modul) * 6 piksel
+        self.assertIn(f'width="{(modules + 8) * 6}"', qr_svg("0110104000001"))
 
     def test_labels_page_lists_code_and_short_name(self):
         admin = User.objects.create_superuser(username="adm", password="x")
@@ -520,3 +521,34 @@ class NotificationTextTests(TestCase):
         card, _ = bot_data.equipment_card(self.e.pk)
         self.assertIn("Inventar №", card)
         self.assertIn("komplekt", card)  # kartada to'liq nom
+
+
+class LabelsPageMarkerTests(TestCase):
+    def test_labels_page_shows_new_qr_format_marker_and_is_not_cached(self):
+        admin = User.objects.create_superuser(username="adm2", password="x")
+        wh = Warehouse.objects.create(name="W2")
+        Equipment.objects.create(code="22122150007162", name="Защищенный планшет", warehouse=wh)
+        self.client.force_login(admin)
+        r = self.client.get(reverse("labels"))
+        html_ = r.content.decode()
+        self.assertIn("Yangi QR formati", html_)
+        self.assertIn("21×21", html_)       # oddiy QR (Micro QR 15×15 bo'lardi)
+        self.assertIn("Inv. №", html_)
+        self.assertIn("no-store", r["Cache-Control"])
+
+
+class BuildMarkerTests(TestCase):
+    def test_bot_home_screen_shows_build_version(self):
+        from .version import BUILD
+        text, _ = bot_data.home_screen()
+        self.assertIn(f"versiya: {BUILD}", text)
+
+
+class ScannerAssetsTests(TestCase):
+    def test_scanner_loads_both_decoders_locally(self):
+        u = User.objects.create_user(username="sc", password="x")
+        self.client.force_login(u)
+        html_ = self.client.get(reverse("take")).content.decode()
+        self.assertIn("/static/inventory/html5-qrcode.min.js", html_)
+        self.assertIn("/static/inventory/jsQR.js", html_)  # zaxira dekoder
+        self.assertEqual(self.client.get("/static/inventory/jsQR.js").status_code, 200)

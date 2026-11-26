@@ -15,6 +15,7 @@ from django.utils import timezone
 from . import reports, security
 from .access import display_name
 from .fmt import short_name
+from .version import BUILD
 from .models import BlockedIP, Equipment, Movement, Region, SecurityEvent, SecurityState, Warehouse
 
 PER_PAGE = 4       # "Tadbirda" ro'yxatida bir sahifadagi chiqarishlar soni
@@ -91,7 +92,7 @@ def home_screen():
         lines.append(f"❗ Ko'rilmagan xavfsizlik hodisalari: {alerts} ta")
     else:
         lines.append("🛡 Xavfsizlik: tinch ✅")
-    lines += ["", "Bo'limni tanlang 👇"]
+    lines += ["", "Bo'limni tanlang 👇", f"<i>versiya: {BUILD}</i>"]
 
     sec_label = "🛡 Xavfsizlik" + (f" ({alerts})" if alerts else "")
     rows = [

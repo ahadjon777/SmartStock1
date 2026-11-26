@@ -1,5 +1,6 @@
 {% load static %}
 <script src="{% static 'inventory/html5-qrcode.min.js' %}"></script>
+<script src="{% static 'inventory/jsQR.js' %}"></script>
 <script>
 /* Kamera to'xtamaydi: ketma-ket skanerlanadi. Bir xil QR kamera ko'rinishida tursa, bir marta hisoblanadi
    (u ko'rinishdan chiqib, dedupeMs o'tgandan keyingina qayta o'qiladi). */
@@ -32,6 +33,26 @@ function initScanner(onCode, opts) {
     if (!el) { el = document.createElement('div'); el.id = 'camwarn'; el.className = 'msg err'; btn.insertAdjacentElement('afterend', el); }
     el.textContent = text;
   }
+  /* Ikkinchi, mustaqil dekoder (jsQR): asosiy kutubxona ba'zi QR naqshlarini o'qiy olmaydi (sinovda ~2-5%).
+     Kamera kadrlarini har 250 ms da jsQR ham tekshiradi; kim birinchi o'qisa, shuni hisoblaymiz (takror dedupe qilinadi). */
+  let fbTimer = null, fbCanvas = null;
+  function startFallback() {
+    if (!window.jsQR || fbTimer) return;
+    fbCanvas = document.createElement('canvas');
+    const ctx = fbCanvas.getContext('2d', {willReadFrequently: true});
+    fbTimer = setInterval(() => {
+      const v = document.querySelector('#reader video');
+      if (!v || v.readyState < 2 || !v.videoWidth) return;
+      const k = Math.min(1, 800 / v.videoWidth);
+      fbCanvas.width = Math.round(v.videoWidth * k); fbCanvas.height = Math.round(v.videoHeight * k);
+      try {
+        ctx.drawImage(v, 0, 0, fbCanvas.width, fbCanvas.height);
+        const r = window.jsQR(ctx.getImageData(0, 0, fbCanvas.width, fbCanvas.height).data, fbCanvas.width, fbCanvas.height, {inversionAttempts: 'dontInvert'});
+        if (r && r.data) onScan(r.data);
+      } catch (e) {}
+    }, 250);
+  }
+  function stopFallback() { if (fbTimer) clearInterval(fbTimer); fbTimer = null; }
   function onScan(text) {
     text = (text || '').trim();
     if (!text) return;
@@ -55,12 +76,13 @@ function initScanner(onCode, opts) {
         {fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return {width: s, height: s}; }},
         onScan, () => {}
       );
-      running = true; btn.textContent = "Kamerani o'chirish"; warn('');
+      running = true; btn.textContent = "Kamerani o'chirish"; warn(''); startFallback();
     } catch (e) { warn(cameraError(e)); }
     btn.disabled = false;
   }
   async function stop() {
     btn.disabled = true;
+    stopFallback();
     try { await scanner.stop(); } catch (e) {}
     running = false; btn.textContent = 'Kamerani yoqish'; btn.disabled = false;
   }

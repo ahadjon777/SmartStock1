@@ -8,12 +8,14 @@
 body{font-family:system-ui,Segoe UI,Roboto,sans-serif;margin:0;padding:12px;color:#000;background:#fff}
 form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 form input,form select,form button{padding:9px;font-size:1rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.qrinfo{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#e7f8ec;color:#0b5a25;font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .l{border:1px dashed #999;padding:8px;text-align:center;break-inside:avoid}
-.l svg{width:100%;height:auto;max-width:130px;display:block;margin:0 auto 4px}
-.l b{display:block;font-size:.85rem}
+.l svg{width:100%;height:auto;max-width:150px;display:block;margin:0 auto 4px}
+.l b{display:block;font-size:.9rem}
+.l small{display:block;font-size:.65rem;color:#666}
 .l span{display:block;font-size:.7rem;color:#444;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-@media print{form{display:none}body{padding:0}.grid{grid-template-columns:repeat(5,1fr)}}
+@media print{form,.qrinfo{display:none}body{padding:0}.grid{grid-template-columns:repeat(5,1fr)}}
 </style>
 </head>
 <body>
@@ -24,8 +26,9 @@ form input,form select,form button{padding:9px;font-size:1rem}
 <button>Ko'rsatish</button>
 <button type="button" onclick="print()">Chop etish</button>
 </form>
+{% if qr_info %}<p class="qrinfo">✅ Yangi QR formati: oddiy QR (versiya {{ qr_info.version }}, {{ qr_info.side }}×{{ qr_info.side }} modul), telefon kamerasi o'qiy oladi. <small>({{ qr_info.build }})</small></p>{% endif %}
 <div class="grid">
-{% for i in items %}<div class="l">{{ i.svg|safe }}<b>{{ i.code }}</b><span>{{ i.name }}</span></div>{% empty %}<p>Texnika topilmadi.</p>{% endfor %}
+{% for i in items %}<div class="l">{{ i.svg|safe }}<small>Inv. №</small><b>{{ i.code }}</b><span>{{ i.name }}</span></div>{% empty %}<p>Texnika topilmadi.</p>{% endfor %}
 </div>
 </body>
 </html>

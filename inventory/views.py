@@ -10,23 +10,30 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from .access import display_name, is_admin, is_restricted, managed_warehouses
 from .fmt import item_label, short_name
 from .models import Equipment, Movement, Region, Warehouse
 from .notify import notify
+from .version import BUILD
 
 
 def make_qr(code):
     """Faqat oddiy (standart) QR. segno.make() qisqa raqamli kodlarni avtomatik «Micro QR» qilib yaratadi:
     telefon kamerasi va brauzer skaneri Micro QR'ni o'qiy olmaydi (faqat ayrim qo'l skanerlari o'qiydi)."""
-    return segno.make_qr(code, error="m")
+    # mask=4: brauzer skaneri (zxing-js) 300 ta sinov kodining 299 tasini o'qidi; avtomatik tanlangan niqob esa 286 tasini
+    return segno.make_qr(code, error="m", mask=4)
 
 
 def qr_svg(code):
-    # border=4: standart bo'yicha QR atrofidagi bo'sh maydon (quiet zone) kamida 4 modul bo'lishi kerak
-    return make_qr(code).svg_inline(scale=4, border=4, dark="#000", light="#fff")
+    # border=4: standart bo'yicha QR atrofidagi bo'sh maydon (quiet zone) kamida 4 modul bo'lishi kerak.
+    # scale=6: ekranda va chop etishda modul kattaroq, telefon kamerasi uzoqdan ham o'qiy oladi
+    return make_qr(code).svg_inline(scale=6, border=4, dark="#000", light="#fff")
+
+
+QR_BUILD = BUILD  # /labels/ sahifasida ko'rinadi: server yangi kodda ishlayotganini tekshirish uchun
 
 PERIODS = {
     "week": ("Hafta", 7),
@@ -89,6 +96,7 @@ def _equipment_lines(items, limit=35):
     return lines
 
 
+@never_cache
 @staff_member_required
 def labels(request):
     """QR yorliqlarni chop etish: ?warehouse=<id>&q=<kod boshlanishi>&limit=<son>."""
@@ -102,8 +110,13 @@ def labels(request):
         {"code": e.code, "name": short_name(e.name, 40), "svg": qr_svg(e.code)}
         for e in qs[: min(limit, 500)]
     ]
+    sample = make_qr(items[0]["code"]) if items else None
+    qr_info = None
+    if sample is not None:
+        side = sample.symbol_size(border=0)[0]
+        qr_info = {"micro": sample.is_micro, "version": sample.version, "side": side, "build": QR_BUILD}
     return render(request, "inventory/labels.html", {
-        "items": items, "warehouses": Warehouse.objects.all(),
+        "items": items, "warehouses": Warehouse.objects.all(), "qr_info": qr_info,
     })
 
 
