@@ -100,6 +100,8 @@ if os.environ.get("HTTPS", "0") == "1":
         # Proksi TLS'ni o'zi tugatadi: Django so'rovni HTTPS deb bilishi uchun (aks holda CSRF "Origin" tekshiruvi 403 beradi)
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+OVERDUE_DAYS = int(os.environ.get("OVERDUE_DAYS", "7"))  # shundan ko'p kun tadbirda tursa, panelda «uzoq vaqt» deb belgilanadi
+
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "scan"
 LOGOUT_REDIRECT_URL = "login"

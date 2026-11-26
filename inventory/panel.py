@@ -1,19 +1,25 @@
+import csv
+from collections import OrderedDict
+from datetime import timedelta
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.db.models.deletion import ProtectedError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .access import is_admin, managed_warehouses, scope
 from .forms import EquipmentForm, StaffForm, WarehouseForm
+from .fmt import short_name
 from .importer import import_workbook
-from .models import Equipment, Movement, Warehouse
+from .models import Equipment, Movement, Region, Warehouse
 
 User = get_user_model()
 
@@ -53,6 +59,21 @@ def human(delta):
     return f"{minutes} daq"
 
 
+def overdue_days():
+    """Necha kundan keyin tadbirdagi texnika «uzoq vaqt» deb belgilanadi (settings.OVERDUE_DAYS)."""
+    return int(getattr(settings, "OVERDUE_DAYS", 7))
+
+
+def region_label(value):
+    return Region(value).label if value in Region.values else value
+
+
+def csv_safe(value):
+    """Excel'da formula sifatida bajarilib ketmasligi uchun (=, +, -, @ bilan boshlanuvchi matn)."""
+    value = "" if value is None else str(value)
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
 def sort_context(request, allowed):
     """Build safe sortable links using an explicit field allowlist."""
     current = request.GET.get("sort", "")
@@ -89,42 +110,125 @@ def home(request):
     wh = scope(request.user)
     eq = Equipment.objects.filter(warehouse__in=wh)
     mv = Movement.objects.filter(equipment__warehouse__in=wh)
+    open_mv = mv.filter(in_at__isnull=True)
+    now = timezone.now()
     today = timezone.localdate()
+    limit = now - timedelta(days=overdue_days())
+
+    total = eq.count()
+    out = eq.filter(status=Equipment.Status.OUT).count()
+
+    # Kimda nima: har bir chiqarish (kim + hudud + tadbir) bo'yicha guruh
+    groups = OrderedDict()
+    for m in open_mv.select_related("equipment").order_by("out_at"):
+        g = groups.setdefault((m.taken_by, m.region, m.event), {
+            "person": m.taken_by, "region": region_label(m.region), "event": m.event,
+            "total": 0, "assigned": 0, "oldest": m.out_at,
+        })
+        g["total"] += 1
+        g["assigned"] += bool(m.holder)
+    people = []
+    for g in groups.values():
+        g["left"] = g["total"] - g["assigned"]
+        g["pct"] = round(g["assigned"] * 100 / g["total"])
+        g["since"] = human(now - g["oldest"])
+        g["long"] = g["oldest"] < limit
+        people.append(g)
+    people.sort(key=lambda g: (-g["left"], g["oldest"]))
+
+    warehouses = list(wh.annotate(
+        total=Count("equipment"),
+        out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT)),
+    ))
+    for w in warehouses:
+        w.pct = round(w.out * 100 / w.total) if w.total else 0
+
     return render_panel(request, "panel/home.html", "home", {
-        "total": eq.count(),
-        "out": eq.filter(status=Equipment.Status.OUT).count(),
+        "total": total, "out": out, "out_pct": round(out * 100 / total) if total else 0,
+        "unassigned": open_mv.filter(holder="").count(),
+        "long_out": open_mv.filter(out_at__lt=limit).count(),
+        "overdue_days": overdue_days(),
         "today_out": mv.filter(out_at__date=today).count(),
         "today_in": mv.filter(in_at__date=today).count(),
-        "warehouses": wh.annotate(
-            total=Count("equipment"),
-            out=Count("equipment", filter=Q(equipment__status=Equipment.Status.OUT)),
-        ),
-        "recent": mv.select_related("equipment")[:10],
+        "people": people,
+        "warehouses": warehouses,
+        "recent": mv.select_related("equipment").order_by("-out_at")[:10],
+        "now": timezone.localtime(now),
+        "live": True,
     })
 
 
 @panel_view()
 def out_now(request):
     allowed = {
-        "date": "out_at", "person": "taken_by", "code": "equipment__code",
+        "date": "out_at", "person": "taken_by", "holder": "holder", "code": "equipment__code",
         "name": "equipment__name", "warehouse": "equipment__warehouse__name",
     }
-    qs = Movement.objects.filter(
-        in_at__isnull=True, equipment__warehouse__in=scope(request.user),
-    ).select_related("equipment", "equipment__warehouse").order_by("taken_by", "out_at")
+    wh = scope(request.user)
+    base = Movement.objects.filter(in_at__isnull=True, equipment__warehouse__in=wh)
+    now = timezone.now()
+    limit = now - timedelta(days=overdue_days())
+
+    qs = base.select_related("equipment", "equipment__warehouse")
     q = request.GET.get("q", "").strip()
     if q:
         qs = qs.filter(
             Q(equipment__code__icontains=q) | Q(equipment__name__icontains=q)
-            | Q(taken_by__icontains=q) | Q(holder__icontains=q)
+            | Q(taken_by__icontains=q) | Q(holder__icontains=q) | Q(event__icontains=q)
         )
+    warehouse = request.GET.get("warehouse", "")
+    if warehouse.isdigit():
+        qs = qs.filter(equipment__warehouse_id=warehouse)
+    state = request.GET.get("state", "")
+    if state == "unassigned":
+        qs = qs.filter(holder="")
+    elif state == "long":
+        qs = qs.filter(out_at__lt=limit)
+    else:
+        state = ""
     qs = apply_sort(qs, request, allowed, "date")
-    now = timezone.now()
     rows = list(qs)
-    for movement in rows:
-        movement.since = human(now - movement.out_at)
+
+    if request.GET.get("export") == "csv":
+        resp = HttpResponse(content_type="text/csv; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="tadbirda-{timezone.localdate():%Y-%m-%d}.csv"'
+        resp.write("\ufeff")  # Excel kirill/o'zbek harflarini to'g'ri ochishi uchun
+        w = csv.writer(resp)
+        w.writerow(["Inventar №", "Nomi", "Olgan shaxs", "Biriktirilgan shaxs", "Hudud", "Tadbir", "Ombor", "Chiqqan vaqt", "Qancha vaqt"])
+        for m in rows:
+            w.writerow([csv_safe(v) for v in (
+                m.equipment.code, m.equipment.name, m.taken_by, m.holder or "biriktirilmagan",
+                region_label(m.region), m.event, m.equipment.warehouse.name,
+                timezone.localtime(m.out_at).strftime("%d.%m.%Y %H:%M"), human(now - m.out_at),
+            )])
+        return resp
+
+    for m in rows:
+        m.since = human(now - m.out_at)
+        m.long = m.out_at < limit
+        m.short = short_name(m.equipment.name, 40)
+        m.region_name = region_label(m.region)
+
+    keep = request.GET.copy()
+    for k in ("state", "page", "export"):
+        keep.pop(k, None)
+    def link(value):
+        params = keep.copy()
+        if value:
+            params["state"] = value
+        qs_ = params.urlencode()
+        return "?" + qs_ if qs_ else "?"
+    export = request.GET.copy()
+    export["export"] = "csv"
+
     return render_panel(request, "panel/out.html", "out", {
-        "rows": rows, "q": q, **sort_context(request, allowed),
+        "rows": rows, "q": q, "state": state, "warehouses": wh, "warehouse": warehouse,
+        "count_all": base.count(), "count_unassigned": base.filter(holder="").count(),
+        "count_long": base.filter(out_at__lt=limit).count(), "overdue_days": overdue_days(),
+        "state_links": {"all": link(""), "unassigned": link("unassigned"), "long": link("long")},
+        "export_url": "?" + export.urlencode(),
+        "now": timezone.localtime(now), "live": True,
+        **sort_context(request, allowed),
     })
 
 
@@ -144,8 +248,21 @@ def equipment_list(request):
         qs = qs.filter(Q(code__icontains=q) | Q(name__icontains=q))
     qs = apply_sort(qs, request, allowed, "code")
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
+    # Hozir tadbirda bo'lganlar uchun: kim olgan va kimga biriktirilgan (bitta qo'shimcha so'rov)
+    current = {
+        m.equipment_id: m for m in Movement.objects.filter(
+            in_at__isnull=True, equipment__in=list(page.object_list),
+        )
+    }
+    for e in page.object_list:
+        e.current = current.get(e.pk)
+        if e.current:
+            e.current.region_name = region_label(e.current.region)
+    keep = request.GET.copy()
+    keep.pop("page", None)
     return render_panel(request, "panel/equipment.html", "equipment", {
         "page": page, "warehouses": wh, "statuses": Equipment.Status.choices,
+        "page_query": keep.urlencode(),
         **sort_context(request, allowed),
     })
 

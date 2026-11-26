@@ -92,3 +92,11 @@ Dastur o'ziga qilingan hujumni aniqlaydi, Telegram'ga ogohlantirish yuboradi va 
 
 **Sozlamalar (ixtiyoriy):** `SECURITY_ALLOWLIST_IPS`, `SECURITY_FAIL_LIMIT`, `SECURITY_USER_FAIL_LIMIT`, `SECURITY_SCAN_LIMIT`.
 Proksi (nginx, cloudflared, ngrok) orqasida ishlasangiz `TRUST_X_FORWARDED_FOR=1` qo'ying, aks holda hamma so'rov bitta IP'dan ko'rinadi. Proksisiz bu o'zgaruvchini yoqmang.
+
+## Panel va statistika
+
+- `/panel/` — jonli bosh sahifa: jami / tadbirda / biriktirilmagan / uzoq tadbirda, "Kimda nima" jadvali, omborlar bandligi, so'nggi harakatlar. Sahifa 30 soniyada o'zi yangilanadi.
+- `/panel/out/` — hozir tadbirda turgan texnika: kim olgan, **kimga biriktirilgan**, hudud/tadbir, qancha vaqt. Filtrlar: biriktirilmagan, uzoq vaqt, ombor, qidiruv; CSV (Excel) eksport.
+- `/panel/equipment/` — "Hozir kimda" ustuni; sahifalash filtrlarni saqlaydi.
+- `/stats/` — hududlar bo'yicha statistika, eng ko'p ishlatilgan texnika va shaxslar.
+- `OVERDUE_DAYS` (standart 7) — "uzoq vaqt" chegarasi.

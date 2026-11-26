@@ -1,30 +1,60 @@
 {% extends "panel/base.html" %}
 {% block panel %}
-<div class="grid4">
-<div class="card"><div class="num">{{ total }}</div><span class="muted">Jami texnika</span></div>
-<div class="card"><div class="num">{{ out }}</div><span class="muted">Hozir tadbirda</span></div>
-<div class="card"><div class="num">{{ today_out }}</div><span class="muted">Bugun chiqarilgan</span></div>
-<div class="card"><div class="num">{{ today_in }}</div><span class="muted">Bugun qaytarilgan</span></div>
+<p class="live"><i></i>Jonli ma'lumot · {{ now|date:"H:i:s" }} · sahifa har 30 soniyada o'zi yangilanadi</p>
+
+<div class="kpi">
+<div class="card"><div class="num">{{ total }}</div><span class="lbl">Jami texnika</span><div class="sub">hamma omborlarda</div></div>
+<a class="card" href="{% url 'panel_out' %}"><div class="num">{{ out }}</div><span class="lbl">Hozir tadbirda</span><div class="sub">jamining {{ out_pct }}% i</div></a>
+<a class="card" href="{% url 'panel_out' %}?state=unassigned"><div class="num {% if unassigned %}o{% else %}z{% endif %}">{{ unassigned }}</div><span class="lbl">Biriktirilmagan</span><div class="sub">kimga berilgani belgilanmagan</div></a>
+<a class="card" href="{% url 'panel_out' %}?state=long"><div class="num {% if long_out %}o{% else %}z{% endif %}">{{ long_out }}</div><span class="lbl">Uzoq tadbirda</span><div class="sub">{{ overdue_days }} kundan ortiq</div></a>
+<div class="card"><div class="num">{{ today_out }}</div><span class="lbl">Bugun chiqdi</span><div class="sub">ombordan</div></div>
+<div class="card"><div class="num">{{ today_in }}</div><span class="lbl">Bugun qaytdi</span><div class="sub">omborga</div></div>
 </div>
 
+{% if unassigned or long_out %}
+<div class="card attn">
+<b>⚠️ Diqqat talab qiladi</b>
+{% if unassigned %}<div class="sub2" style="font-size:.9rem;color:var(--t);margin-top:6px">{{ unassigned }} ta texnika kimga biriktirilgani belgilanmagan. <a href="{% url 'panel_out' %}?state=unassigned">Ko'rish →</a></div>{% endif %}
+{% if long_out %}<div class="sub2" style="font-size:.9rem;color:var(--t);margin-top:6px">{{ long_out }} ta texnika {{ overdue_days }} kundan ortiq tadbirda turibdi. <a href="{% url 'panel_out' %}?state=long">Ko'rish →</a></div>{% endif %}
+</div>
+{% endif %}
+
 <div class="card tw">
-<b>Omborlar</b>
+<h3 class="t">Kimda nima</h3>
+<div class="sub2" style="margin-bottom:8px">Har bir chiqarish bo'yicha: texnikaning nechtasi xodimlarga biriktirilgan.</div>
 <table>
-<tr><th>Ombor</th><th>Jami</th><th>Tadbirda</th></tr>
-{% for w in warehouses %}<tr><td>{{ w.name }}</td><td>{{ w.total }}</td><td>{{ w.out }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">Ombor yo'q</td></tr>{% endfor %}
+<tr><th>Kim olgan</th><th>Hudud / tadbir</th><th>Texnika</th><th>Biriktirilgan</th><th>Qancha vaqt</th><th></th></tr>
+{% for g in people %}<tr>
+<td><b>{{ g.person }}</b></td>
+<td>{{ g.region }}{% if g.event %}<small>{{ g.event }}</small>{% endif %}</td>
+<td>{{ g.total }} ta</td>
+<td style="min-width:120px"><div class="pbar{% if g.left %} o{% endif %}"><i style="width:{{ g.pct }}%"></i></div><small>{{ g.assigned }} / {{ g.total }}{% if g.left %} · <span class="cell-o">{{ g.left }} ta qoldi</span>{% else %} · hammasi ✓{% endif %}</small></td>
+<td class="{% if g.long %}cell-r{% endif %}">{{ g.since }}</td>
+<td><a class="l" href="{% url 'panel_out' %}?q={{ g.person|urlencode }}">Ko'rish</a></td>
+</tr>{% empty %}<tr><td colspan="6" class="muted">Hozir tadbirda texnika yo'q ✅</td></tr>{% endfor %}
 </table>
 </div>
 
 <div class="card tw">
-<b>So'nggi harakatlar</b>
+<h3 class="t">Omborlar</h3>
 <table>
-<tr><th>Texnika</th><th>Olgan</th><th>Chiqdi</th><th>Qaytdi</th></tr>
+<tr><th>Ombor</th><th>Jami</th><th>Tadbirda</th><th>Band</th></tr>
+{% for w in warehouses %}<tr><td>{{ w.name }}</td><td>{{ w.total }}</td><td>{{ w.out }}</td>
+<td style="min-width:120px"><div class="pbar"><i style="width:{{ w.pct }}%"></i></div><small>{{ w.pct }}%</small></td></tr>{% empty %}<tr><td colspan="4" class="muted">Ombor yo'q</td></tr>{% endfor %}
+</table>
+</div>
+
+<div class="card tw">
+<h3 class="t">So'nggi harakatlar</h3>
+<table>
+<tr><th>Texnika</th><th>Olgan</th><th>Biriktirilgan</th><th>Chiqdi</th><th>Qaytdi</th></tr>
 {% for m in recent %}<tr>
-<td>{{ m.equipment.code }} <span class="muted">{{ m.equipment.name }}</span></td>
+<td>{{ m.equipment.name|truncatechars:34 }}<small>inv. № {{ m.equipment.code }}</small></td>
 <td>{{ m.taken_by }}</td>
+<td>{% if m.holder %}{{ m.holder }}{% elif m.in_at %}<span class="muted">—</span>{% else %}<span class="tag w">biriktirilmagan</span>{% endif %}</td>
 <td>{{ m.out_at|date:"d.m H:i" }}</td>
 <td>{% if m.in_at %}{{ m.in_at|date:"d.m H:i" }}{% else %}<span class="tag o">tadbirda</span>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="4" class="muted">Harakat hali yo'q</td></tr>{% endfor %}
+</tr>{% empty %}<tr><td colspan="5" class="muted">Harakat hali yo'q</td></tr>{% endfor %}
 </table>
 </div>
 {% endblock %}

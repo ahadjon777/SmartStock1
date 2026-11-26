@@ -16,14 +16,16 @@
   <div class="bar"><select name="action" required><option value="">Amalni tanlang</option><option value="move">Boshqa omborga o'tkazish</option><option value="delete">O'chirish</option></select><select name="warehouse"><option value="">Ombor tanlang</option>{% for w in warehouses %}<option value="{{ w.pk }}">{{ w.name }}</option>{% endfor %}</select><button class="sm">Bajarish</button></div>
 {% endif %}
 <div class="card tw"><table>
-<tr>{% if panel_admin %}<th>Tanlash</th>{% endif %}<th><a class="l" href="{{ sort_links.code }}">Kod ↕</a></th><th><a class="l" href="{{ sort_links.name }}">Nomi ↕</a></th><th><a class="l" href="{{ sort_links.warehouse }}">Ombor ↕</a></th><th><a class="l" href="{{ sort_links.status }}">Holati ↕</a></th><th>Amallar</th></tr>
+<tr>{% if panel_admin %}<th>✓</th>{% endif %}<th><a class="l" href="{{ sort_links.code }}">Kod ↕</a></th><th><a class="l" href="{{ sort_links.name }}">Nomi ↕</a></th><th><a class="l" href="{{ sort_links.warehouse }}">Ombor ↕</a></th><th><a class="l" href="{{ sort_links.status }}">Holati ↕</a></th><th>Hozir kimda</th><th>Amallar</th></tr>
 {% for equipment in page %}<tr>
   {% if panel_admin %}<td><input type="checkbox" name="equipment_ids" value="{{ equipment.pk }}"></td>{% endif %}
-  <td>{{ equipment.code }}</td><td>{{ equipment.name }}</td><td>{{ equipment.warehouse.name }}</td><td>{{ equipment.get_status_display }}</td>
+  <td>{{ equipment.code }}</td><td>{{ equipment.name }}</td><td>{{ equipment.warehouse.name }}</td>
+  <td>{% if equipment.current %}<span class="tag o">{{ equipment.get_status_display }}</span>{% else %}<span class="tag g">{{ equipment.get_status_display }}</span>{% endif %}</td>
+  <td>{% if equipment.current %}{% if equipment.current.holder %}<b>{{ equipment.current.holder }}</b>{% else %}<span class="tag w">biriktirilmagan</span>{% endif %}<small>olgan: {{ equipment.current.taken_by }}{% if equipment.current.event %} · {{ equipment.current.event }}{% endif %}</small>{% else %}<span class="muted">—</span>{% endif %}</td>
   <td><a class="l" href="{% url 'panel_equipment_edit' equipment.pk %}">Tahrirlash</a>
   {% if panel_admin %}<form method="post" action="{% url 'panel_equipment_delete' equipment.pk %}" style="display:inline" onsubmit="return confirm('Ushbu texnika va unga tegishli harakatlar o‘chirilsinmi?')">{% csrf_token %}<button class="sm" type="submit">O'chirish</button></form>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="6" class="muted">Texnika topilmadi</td></tr>{% endfor %}
+</tr>{% empty %}<tr><td colspan="7" class="muted">Texnika topilmadi</td></tr>{% endfor %}
 </table></div>
 {% if panel_admin %}</form>{% endif %}
-{% if page.paginator.num_pages > 1 %}<div class="bar" style="justify-content:center">{% if page.has_previous %}<a class="btn sm" href="?page={{ page.previous_page_number }}">← Oldingi</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="btn sm" href="?page={{ page.next_page_number }}">Keyingi →</a>{% endif %}</div>{% endif %}
+{% if page.paginator.num_pages > 1 %}<div class="bar" style="justify-content:center">{% if page.has_previous %}<a class="btn sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page.previous_page_number }}">← Oldingi</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="btn sm" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page.next_page_number }}">Keyingi →</a>{% endif %}</div>{% endif %}
 {% endblock %}

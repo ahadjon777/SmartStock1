@@ -356,23 +356,44 @@ def dashboard(request):
         key = "month"
     since = timezone.now() - timedelta(days=PERIODS[key][1])
 
-    sums = defaultdict(lambda: [Decimal("0"), 0])
+    sums = defaultdict(lambda: [Decimal("0"), Decimal("0"), 0])
+    by_item = defaultdict(int)
+    by_person = defaultdict(int)
     qs = Movement.objects.filter(in_at__isnull=False, in_at__gte=since).select_related("equipment")
     for m in qs:
         s = sums[m.region]
         s[0] += m.work_hours
-        s[1] += 1
+        s[1] += m.total_hours
+        s[2] += 1
+        by_item[(m.equipment.code, m.equipment.name)] += 1
+        by_person[m.taken_by] += 1
 
     rows = []
+    done = 0
     for value, label in Region.choices:
-        total, count = sums.get(value, [Decimal("0"), 0])
-        avg = (total / count).quantize(Decimal("0.01")) if count else Decimal("0")
-        rows.append({"region": label, "count": count, "avg": avg})
+        work, total_h, count = sums.get(value, [Decimal("0"), Decimal("0"), 0])
+        done += count
+        avg = (work / count).quantize(Decimal("0.01")) if count else Decimal("0")
+        avg_total = (total_h / count).quantize(Decimal("0.01")) if count else Decimal("0")
+        rows.append({"region": label, "count": count, "avg": avg, "avg_total": avg_total})
+    top = max((r["count"] for r in rows), default=0) or 1
+    for r in rows:
+        r["pct"] = round(r["count"] * 100 / top)
 
+    out_now = Equipment.objects.filter(status=Equipment.Status.OUT).count()
+    total = Equipment.objects.count()
+    top_items = sorted(by_item.items(), key=lambda kv: -kv[1])[:5]
+    top_people = sorted(by_person.items(), key=lambda kv: -kv[1])[:5]
     return render(request, "inventory/dashboard.html", {
         "rows": rows,
         "periods": [(k, v[0]) for k, v in PERIODS.items()],
         "current": key,
-        "out_now": Equipment.objects.filter(status=Equipment.Status.OUT).count(),
-        "total": Equipment.objects.count(),
+        "period_label": PERIODS[key][0],
+        "out_now": out_now,
+        "total": total,
+        "out_pct": round(out_now * 100 / total) if total else 0,
+        "done": done,
+        "top_items": [{"code": c, "name": short_name(n), "count": k} for (c, n), k in top_items],
+        "top_people": [{"name": n, "count": k} for n, k in top_people],
+        "now": timezone.now(),
     })

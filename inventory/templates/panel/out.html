@@ -1,9 +1,43 @@
 {% extends "panel/base.html" %}
 {% block panel %}
+<p class="live"><i></i>Jonli ma'lumot · {{ now|date:"H:i:s" }} · sahifa har 30 soniyada o'zi yangilanadi</p>
+
+<form method="get" class="bar">
+  <input name="q" value="{{ q }}" placeholder="Texnika, inventar №, olgan yoki biriktirilgan shaxs, tadbir">
+  <select name="warehouse"><option value="">Barcha omborlar</option>{% for w in warehouses %}<option value="{{ w.id }}"{% if warehouse == w.id|stringformat:"s" %} selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
+  {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
+  <button class="sm">Qidirish</button>
+</form>
+
+<div class="tabs">
+<a href="{{ state_links.all }}" class="{% if not state %}on{% endif %}">Hammasi · {{ count_all }}</a>
+<a href="{{ state_links.unassigned }}" class="{% if state == 'unassigned' %}on{% endif %}">Biriktirilmagan · {{ count_unassigned }}</a>
+<a href="{{ state_links.long }}" class="{% if state == 'long' %}on{% endif %}">{{ overdue_days }} kundan ortiq · {{ count_long }}</a>
+</div>
+
+<div class="sum">
+<span class="muted">Ko'rsatilmoqda: <b style="color:var(--t)">{{ rows|length }}</b> ta texnika</span>
+<a class="btn sm" href="{{ export_url }}" style="background:#232a45;width:auto">⬇ Excel (CSV) yuklab olish</a>
+</div>
+
 <div class="card tw">
 <table>
-<tr><th>Ombor</th><th><a class="l" href="{{ sort_links.date }}">Chiqqan vaqt ↕</a></th><th><a class="l" href="{{ sort_links.person }}">Olgan shaxs ↕</a></th><th><a class="l" href="{{ sort_links.code }}">Kod ↕</a></th><th><a class="l" href="{{ sort_links.name }}">Texnika ↕</a></th><th>Qancha vaqt</th></tr>
-{% for m in rows %}<tr><td>{{ m.equipment.warehouse.name }}</td><td>{{ m.out_at }}</td><td>{{ m.taken_by }}</td><td>{{ m.equipment.code }}</td><td>{{ m.equipment.name }}</td><td>{{ m.since }}</td></tr>{% empty %}<tr><td colspan="6" class="muted">Tadbirda texnika yo'q</td></tr>{% endfor %}
+<tr>
+<th><a class="l" href="{{ sort_links.name }}">Texnika ↕</a></th>
+<th><a class="l" href="{{ sort_links.person }}">Kim olgan ↕</a></th>
+<th><a class="l" href="{{ sort_links.holder }}">Kimga biriktirilgan ↕</a></th>
+<th>Hudud / tadbir</th>
+<th><a class="l" href="{{ sort_links.date }}">Chiqqan vaqt ↕</a></th>
+<th>Qancha vaqt</th>
+</tr>
+{% for m in rows %}<tr>
+<td>{{ m.short }}<small>inv. № {{ m.equipment.code }} · {{ m.equipment.warehouse.name }}</small></td>
+<td>{{ m.taken_by }}</td>
+<td>{% if m.holder %}<b>{{ m.holder }}</b>{% else %}<span class="tag w">biriktirilmagan</span>{% endif %}</td>
+<td>{{ m.region_name }}{% if m.event %}<small>{{ m.event }}</small>{% endif %}</td>
+<td>{{ m.out_at|date:"d.m.Y" }}<small>{{ m.out_at|date:"H:i" }}</small></td>
+<td class="{% if m.long %}cell-r{% endif %}">{{ m.since }}{% if m.long %}<small class="cell-r">uzoq vaqt</small>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6" class="muted">{% if q or state or warehouse %}Bu filtr bo'yicha hech narsa topilmadi.{% else %}Hozir tadbirda texnika yo'q ✅{% endif %}</td></tr>{% endfor %}
 </table>
 </div>
 {% endblock %}

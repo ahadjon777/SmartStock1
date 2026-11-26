@@ -552,3 +552,65 @@ class ScannerAssetsTests(TestCase):
         self.assertIn("/static/inventory/html5-qrcode.min.js", html_)
         self.assertIn("/static/inventory/jsQR.js", html_)  # zaxira dekoder
         self.assertEqual(self.client.get("/static/inventory/jsQR.js").status_code, 200)
+
+
+class PanelStatsTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Movement
+        self.admin = User.objects.create_user(username="boss", password="x", is_staff=True)
+        self.client.force_login(self.admin)
+        self.w1 = Warehouse.objects.create(name="Asosiy")
+        self.w2 = Warehouse.objects.create(name="Ikkinchi")
+        now = timezone.now()
+        self.a = Equipment.objects.create(code="111", name="Kamera Sony A7", warehouse=self.w1, status="out")
+        self.b = Equipment.objects.create(code="222", name="Mikrofon", warehouse=self.w2, status="out")
+        self.c = Equipment.objects.create(code="333", name="Shtativ", warehouse=self.w1)
+        Movement.objects.create(equipment=self.a, taken_by="Aliyev Vali", region="tashkent_city",
+                                holder="Karimov Sanjar", event="Konsert", out_at=now - timedelta(hours=3))
+        Movement.objects.create(equipment=self.b, taken_by="=cmd()", region="other_regions",
+                                out_at=now - timedelta(days=10))
+
+    def test_home_metrics(self):
+        r = self.client.get(reverse("panel_home"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["total"], 3)
+        self.assertEqual(r.context["out"], 2)
+        self.assertEqual(r.context["unassigned"], 1)
+        self.assertEqual(r.context["long_out"], 1)
+        self.assertContains(r, "Karimov Sanjar")
+        self.assertContains(r, "biriktirilmagan")
+
+    def test_out_shows_holder_and_filters(self):
+        url = reverse("panel_out")
+        r = self.client.get(url)
+        self.assertContains(r, "Karimov Sanjar")
+        self.assertEqual(len(r.context["rows"]), 2)
+        r = self.client.get(url, {"state": "unassigned"})
+        self.assertEqual([m.equipment.code for m in r.context["rows"]], ["222"])
+        r = self.client.get(url, {"state": "long"})
+        self.assertEqual([m.equipment.code for m in r.context["rows"]], ["222"])
+        r = self.client.get(url, {"warehouse": str(self.w1.pk)})
+        self.assertEqual([m.equipment.code for m in r.context["rows"]], ["111"])
+        r = self.client.get(url, {"q": "Karimov"})
+        self.assertEqual(len(r.context["rows"]), 1)
+
+    def test_csv_export_is_safe(self):
+        r = self.client.get(reverse("panel_out"), {"export": "csv"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("text/csv", r["Content-Type"])
+        text = r.content.decode("utf-8-sig")
+        self.assertIn("Karimov Sanjar", text)
+        self.assertIn("'=cmd()", text)
+
+    def test_equipment_list_shows_current_holder_and_keeps_filters(self):
+        r = self.client.get(reverse("panel_equipment"), {"q": "Kamera"})
+        self.assertContains(r, "Karimov Sanjar")
+        self.assertIn("q=Kamera", r.context["page_query"])
+
+    def test_stats_dashboard(self):
+        r = self.client.get(reverse("dashboard"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["out_now"], 2)
+        self.assertEqual(r.context["out_pct"], 67)
